@@ -1,0 +1,6 @@
+[2026-08-14 15:44:03] local.INFO: Trash cleanup skipped: automatic cleanup is disabled in Settings.  
+[2026-08-14 15:44:03] local.INFO: Trash cleanup: no trashed installment plans older than 5 day(s). Nothing to purge.  
+
+[2026-08-14 15:46:30] local.INFO: Trash cleanup (automatic): no trashed installment plans older than 5 day(s). Nothing to purge.  
+[2026-08-14 15:48:01] local.INFO: Trash cleanup (manual): no trashed installment plans older than 30 day(s). Nothing to purge.  
+[2026-08-14 15:48:18] local.INFO: Trash cleanup (manual): no trashed installment plans older than 30 day(s). Nothing to purge.  

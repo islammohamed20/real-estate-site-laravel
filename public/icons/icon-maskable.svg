@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Venecia Developments Maskable">
+  <rect width="512" height="512" rx="128" fill="#0b1120"/>
+  <circle cx="256" cy="256" r="170" fill="#1e293b"/>
+  <path d="M156 380V178c0-18 14-32 32-32h136c18 0 32 14 32 32v202" fill="none" stroke="#517aa3" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M198 380V244h116v136" fill="none" stroke="#f8fafc" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

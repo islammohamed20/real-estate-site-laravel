@@ -1,0 +1,526 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD UI v2 — Premium Glassmorphism design system
+   Scoped under `.dash-ui` (dashboard body only). The public site is
+   never affected. Built from 2026 award-winning dashboard patterns:
+   frosted-glass cards, luminous indigo→cyan accents, deep navy base,
+   micro-interactions, refined data tables.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Design tokens ──────────────────────────────────────────────── */
+
+/* Light mode (inverted-palette convention: dark values on light bg) */
+.dash-ui {
+  --slate-50: 30 41 59;
+  --slate-100: 51 65 85;
+  --slate-200: 71 85 105;
+  --slate-300: 100 116 139;
+  --slate-400: 51 65 85;
+  --slate-500: 100 116 139;
+  --slate-600: 203 213 225;
+  --slate-700: 226 232 240;
+  --slate-800: 238 242 248;
+  --slate-900: 255 255 255;
+  --slate-950: 241 244 250;
+
+  /* Brand → luminous indigo family */
+  --brand-50: 238 242 255;
+  --brand-100: 224 231 255;
+  --brand-200: 199 210 254;
+  --brand-300: 165 180 252;
+  --brand-400: 129 140 248;
+  --brand-500: 99 102 241;
+  --brand-600: 79 70 229;
+  --brand-700: 67 56 202;
+  --brand-800: 55 48 163;
+  --brand-900: 49 46 129;
+  --brand-950: 30 27 75;
+}
+
+/* Dark mode */
+.dark .dash-ui {
+  --slate-50: 226 232 255;
+  --slate-100: 219 226 246;
+  --slate-200: 191 200 224;
+  --slate-300: 148 163 194;
+  --slate-400: 100 116 148;
+  --slate-500: 71 85 110;
+  --slate-600: 51 65 88;
+  --slate-700: 33 44 66;
+  --slate-800: 20 29 48;
+  --slate-900: 13 20 36;
+  --slate-950: 8 12 24;
+
+  --brand-50: 238 242 255;
+  --brand-100: 224 231 255;
+  --brand-200: 199 210 254;
+  --brand-300: 165 180 252;
+  --brand-400: 129 140 248;
+  --brand-500: 99 102 241;
+  --brand-600: 79 70 229;
+  --brand-700: 67 56 202;
+  --brand-800: 55 48 163;
+  --brand-900: 49 46 129;
+  --brand-950: 30 27 75;
+}
+
+/* ── Ambient backdrop ───────────────────────────────────────────── */
+
+.dash-ui {
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgb(var(--brand-500) / 0.16), transparent 60%),
+    radial-gradient(900px 480px at -10% 10%, rgb(34 211 238 / 0.10), transparent 55%),
+    radial-gradient(800px 600px at 50% 115%, rgb(139 92 246 / 0.12), transparent 60%),
+    rgb(var(--slate-950));
+  background-attachment: fixed;
+}
+
+.dark .dash-ui {
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgb(var(--brand-500) / 0.20), transparent 60%),
+    radial-gradient(900px 480px at -10% 10%, rgb(34 211 238 / 0.12), transparent 55%),
+    radial-gradient(800px 600px at 50% 115%, rgb(139 92 246 / 0.16), transparent 60%),
+    rgb(var(--slate-950));
+  background-attachment: fixed;
+}
+
+/* Subtle noise/grid sheen */
+.dash-ui::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(var(--slate-400) / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--slate-400) / 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 100%);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+
+.dash-ui ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.dash-ui ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dash-ui ::-webkit-scrollbar-thumb {
+  background: rgb(var(--slate-600) / 0.5);
+  border-radius: 9999px;
+}
+.dash-ui ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--brand-500) / 0.6);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+
+.dash-ui aside[class*='lg:flex'],
+.dash-ui aside[class*='lg:flex'][class*='inset-y-0'] {
+  background: color-mix(in srgb, rgb(var(--slate-950)) 62%, transparent) !important;
+  border-color: rgb(var(--white) / 0.06) !important;
+  box-shadow: 8px 0 40px -20px rgb(0 0 0 / 0.4);
+}
+.dark .dash-ui aside[class*='lg:flex'] {
+  background: color-mix(in srgb, rgb(var(--slate-950)) 58%, transparent) !important;
+}
+
+/* Sidebar nav links */
+.dash-ui nav a,
+.dash-ui nav button {
+  position: relative;
+  border-radius: 14px;
+}
+
+.dash-ui nav a:hover,
+.dash-ui nav button:hover {
+  background: rgb(var(--white) / 0.06);
+}
+
+/* Active top-level nav item → luminous gradient pill */
+.dash-ui nav a.bg-brand-600,
+.dash-ui nav button.bg-brand-600 {
+  background: linear-gradient(135deg, rgb(var(--brand-500)), rgb(var(--brand-600))) !important;
+  box-shadow: 0 8px 24px -8px rgb(var(--brand-500) / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  color: #fff !important;
+}
+
+/* CRM submenu active items */
+.dash-ui nav a.bg-brand-600 span,
+.dash-ui nav button.bg-brand-600 span {
+  color: #fff !important;
+}
+
+.dash-ui nav .bg-white\/5 {
+  background: rgb(var(--white) / 0.04);
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+
+.dash-ui header {
+  background: color-mix(in srgb, rgb(var(--slate-950)) 55%, transparent) !important;
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border-color: rgb(var(--white) / 0.05) !important;
+}
+
+/* ── Glass cards (Glassmorphism 2.0) ────────────────────────────── */
+
+.dash-ui .app-card,
+.dash-ui .panel,
+.dash-ui .stat,
+.dash-ui .touch-card,
+.dash-ui .app-card--gradient {
+  background:
+    linear-gradient(160deg, rgb(var(--white) / 0.06) 0%, rgb(var(--white) / 0.015) 60%, rgb(var(--white) / 0.03) 100%),
+    rgb(var(--slate-900));
+  border: 1px solid rgb(var(--white) / 0.07);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--white) / 0.09),
+    0 12px 40px -18px rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dash-ui .app-card:hover,
+.dash-ui .panel:hover,
+.dash-ui .stat:hover,
+.dash-ui .touch-card:hover {
+  border-color: rgb(var(--brand-500) / 0.35);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--white) / 0.12),
+    0 18px 50px -18px rgb(0 0 0 / 0.45),
+    0 0 24px -6px rgb(var(--brand-500) / 0.25);
+}
+
+/* Gradient card gets the luminous treatment */
+.dash-ui .app-card--gradient {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgb(var(--brand-500) / 0.16), transparent 55%),
+    radial-gradient(100% 80% at 0% 100%, rgb(139 92 246 / 0.12), transparent 55%),
+    rgb(var(--slate-900));
+}
+
+/* ── Hero banner ────────────────────────────────────────────────── */
+
+.dash-ui .dashboard-hero-card {
+  background:
+    radial-gradient(130% 120% at 100% -20%, rgb(var(--brand-500) / 0.22), transparent 55%),
+    radial-gradient(110% 90% at -10% 120%, rgb(34 211 238 / 0.14), transparent 55%),
+    linear-gradient(160deg, rgb(var(--slate-800)) 0%, rgb(var(--slate-900)) 100%);
+  border: 1px solid rgb(var(--brand-500) / 0.25);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--white) / 0.1),
+    0 24px 60px -20px rgb(0 0 0 / 0.4),
+    0 0 40px -12px rgb(var(--brand-500) / 0.25);
+}
+
+.dash-ui .dashboard-hero-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--white) / 0.14),
+    0 30px 70px -20px rgb(0 0 0 / 0.5),
+    0 0 55px -10px rgb(var(--brand-500) / 0.35);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+
+.dash-ui .app-button {
+  background: linear-gradient(135deg, rgb(var(--brand-500)), rgb(var(--brand-600)));
+  box-shadow: 0 8px 22px -10px rgb(var(--brand-500) / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.22);
+  border: none;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dash-ui .app-button:hover {
+  box-shadow: 0 12px 30px -10px rgb(var(--brand-500) / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  transform: translateY(-1px);
+}
+
+.dash-ui .app-button:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.dash-ui .app-button--ghost {
+  background: rgb(var(--white) / 0.06);
+  box-shadow: inset 0 1px 0 rgb(var(--white) / 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────── */
+
+.dash-ui .app-input,
+.dash-ui .app-select,
+.dash-ui .app-textarea {
+  background: rgb(var(--white) / 0.045);
+  border-color: rgb(var(--white) / 0.09);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dash-ui .app-input:focus,
+.dash-ui .app-select:focus,
+.dash-ui .app-textarea:focus {
+  border-color: rgb(var(--brand-500) / 0.7);
+  box-shadow: 0 0 0 4px rgb(var(--brand-500) / 0.15), inset 0 1px 2px rgb(0 0 0 / 0.1);
+  background: rgb(var(--white) / 0.07);
+}
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+
+.dash-ui .badge {
+  border-color: rgb(var(--white) / 0.1);
+  box-shadow: inset 0 1px 0 rgb(var(--white) / 0.08);
+}
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+
+.dash-ui .app-table thead th {
+  background: rgb(var(--white) / 0.02);
+  letter-spacing: 0.08em;
+}
+
+.dash-ui .app-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.dash-ui .app-table tbody tr:hover {
+  background: rgb(var(--brand-500) / 0.05);
+}
+
+.dash-ui .app-table,
+.dash-ui .stat,
+.dash-ui .app-card--gradient {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Icon tiles ─────────────────────────────────────────────────── */
+
+.dash-ui .icon-tile {
+  background: linear-gradient(135deg, rgb(var(--brand-500) / 0.22), rgb(139 92 246 / 0.14));
+  box-shadow: inset 0 1px 0 rgb(var(--white) / 0.12), 0 4px 14px -6px rgb(var(--brand-500) / 0.5);
+}
+
+/* ── Mobile bottom nav ──────────────────────────────────────────── */
+
+.dash-ui .mobile-bottom-nav {
+  background: color-mix(in srgb, rgb(var(--slate-950)) 72%, transparent) !important;
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+}
+
+/* ── Micro-interactions / entrance ──────────────────────────────── */
+
+.dash-ui .stagger-item {
+  opacity: 0;
+  animation: dash-float-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes dash-float-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-ui .stagger-item {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Mobile: keep the dashboard perfectly still — no entrance motion, no
+   fixed-background repaint jank (which makes the page appear to move). */
+@media (max-width: 767px) {
+  .dash-ui,
+  .dark .dash-ui {
+    background-attachment: scroll;
+  }
+
+  .dash-ui .stagger-item {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Bento helpers ──────────────────────────────────────────────── */
+
+.dash-bento {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .dash-bento--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dash-bento--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dash-bento--hero {
+    grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Tabular numbers everywhere data is shown */
+.dash-ui .text-3xl,
+.dash-ui .text-4xl {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══ Sidebar micro-interactions: glow + slide ═══ */
+
+/* Nav item icons — glow + slide on hover */
+.dash-ui nav a svg,
+.dash-ui nav button svg {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease, color 0.35s ease;
+}
+
+.dash-ui nav a:hover svg,
+.dash-ui nav button:hover svg {
+  transform: translateX(-2px) scale(1.12);
+  filter: drop-shadow(0 0 8px rgb(var(--brand-500) / 0.75));
+}
+
+[dir='rtl'] .dash-ui nav a:hover svg,
+[dir='rtl'] .dash-ui nav button:hover svg {
+  transform: translateX(2px) scale(1.12);
+}
+
+/* Luminous accent bar on the logical start edge (hover + active) */
+.dash-ui nav a::before,
+.dash-ui nav button::before {
+  content: '';
+  position: absolute;
+  inset-block: 32%;
+  inset-inline-start: -10px;
+  width: 4px;
+  border-radius: 99px;
+  background: linear-gradient(to bottom, rgb(var(--brand-400)), rgb(34 211 238 / 0.85));
+  box-shadow: 0 0 10px rgb(var(--brand-500) / 0.8);
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.dash-ui nav a:hover::before,
+.dash-ui nav button:hover::before,
+.dash-ui nav a.bg-brand-600::before,
+.dash-ui nav button.bg-brand-600::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* Collapse / Public Website buttons — glow on hover */
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] a:hover,
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] button:hover {
+  background: rgb(var(--brand-500) / 0.14) !important;
+  box-shadow: 0 0 26px -8px rgb(var(--brand-500) / 0.6);
+  color: #fff !important;
+}
+
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] a svg,
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] button svg {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
+}
+
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] a:hover svg,
+.dash-ui aside[class*='lg:flex'] [class*='mt-auto'] button:hover svg {
+  transform: scale(1.15) rotate(-8deg);
+  filter: drop-shadow(0 0 8px rgb(var(--brand-500) / 0.7));
+}
+
+/* Collapsed-state flyout — glass + glow */
+.dash-ui aside[class*='lg:flex'] [class*='ltr:left-full'] > div {
+  border-color: rgb(var(--brand-500) / 0.22);
+  box-shadow:
+    0 24px 60px -22px rgb(0 0 0 / 0.55),
+    0 0 34px -10px rgb(var(--brand-500) / 0.35),
+    inset 0 1px 0 rgb(var(--white) / 0.1);
+  background: color-mix(in srgb, rgb(var(--slate-900)) 88%, transparent);
+  backdrop-filter: blur(26px) saturate(1.4);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+}
+
+/* ===== WhatsApp chat panel height (mobile-first) ===== */
+.wa-chat {
+  height: calc(100vh - 17rem);
+  min-height: 28rem;
+}
+.wa-chat.wa-chat--open {
+  height: calc(100vh - 12rem);
+}
+@media (max-width: 767px) {
+  .wa-chat {
+    height: calc(100dvh - 17rem);
+  }
+  .wa-chat.wa-chat--open {
+    height: calc(100dvh - 12rem);
+  }
+}
+@media (min-width: 1024px) {
+  .wa-chat,
+  .wa-chat.wa-chat--open {
+    height: calc(100vh - 17rem);
+  }
+}
+
+/* Danger button — solid red, overrides the default gradient .app-button */
+.dash-ui .app-button.app-button--danger {
+  background: #e11d48 !important;
+  box-shadow: 0 8px 22px -10px rgb(225 29 72 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.18) !important;
+  color: #fff !important;
+}
+.dash-ui .app-button.app-button--danger:hover {
+  background: #be123c !important;
+  box-shadow: 0 12px 30px -10px rgb(190 18 60 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.2) !important;
+}
+
+/* ── Collapsed sidebar polish ─────────────────────────────────── */
+/* NOTE: no overflow:hidden on the aside itself — the collapsed flyout menu
+   is positioned outside the sidebar (left-full/right-full) and would be
+   clipped by it. Labels already clip their own text via overflow-hidden. */
+/* Remove the leftover gap next to hidden labels so icons center exactly */
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] nav a,
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] nav button {
+  gap: 0 !important;
+  padding-inline: 0 !important;
+  justify-content: center !important;
+}
+/* Hide section headings entirely (they leave dead vertical space) */
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] > div > div > p {
+  display: none !important;
+}
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] > div > div {
+  margin-bottom: 0 !important;
+}
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] > div.flex-1 {
+  padding-inline: 0.55rem !important;
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+/* Tighter breathing between icon groups */
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] > div.flex-1 > div {
+  margin-bottom: 0.6rem !important;
+}
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] > div.flex-1 > div:last-child {
+  margin-bottom: 0 !important;
+}
+/* Collapse/footer buttons: center icon exactly, hide label */
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] div.mt-auto button,
+.dash-ui aside[class*='lg:flex'][class*='w-[76px]'] div.mt-auto a {
+  gap: 0 !important;
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}

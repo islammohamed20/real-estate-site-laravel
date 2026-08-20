@@ -37,17 +37,17 @@ A modular, production-oriented real estate management platform built with Larave
 
 This repository is being built as a greenfield enterprise foundation. The implementation emphasizes normalized schemas, reusable domain services, and module isolation rather than demo data.
 
-## Recent Venecia Updates
+## آخر تحديثات مشروع فينسيا
 
-The project-management and inventory workflows were updated for the Venecia development:
+تم تحديث إدارة المشروع والمخزون العقاري لمشروع فينسيا كما يلي:
 
-- Added dependent building and floor selectors to the unit create/edit form. Staff select a building first, then only floors belonging to that building are available.
-- Added server-side validation to ensure that the selected building and floor belong to the current project and that the floor belongs to the selected building.
-- Added delayed Alpine.js initialization so existing building and floor selections are restored correctly when editing a unit.
-- Updated new-unit defaults to three bedrooms, two bathrooms, and three terraces.
-- Restricted the installment calculator floor list to floors that contain at least one unit; empty floors are no longer shown.
-- Normalized Venecia inventory records so every unit has a valid project, building, and floor relationship, with consistent unit specifications.
-- Added and maintained feature tests covering project unit forms and calculator floor filtering.
-- Added repository hygiene rules to exclude environment files, dependencies, generated assets, runtime storage, logs, and cache files from future commits.
+- إضافة قائمتين مترابطتين لاختيار العمارة ثم الدور في نموذج إضافة وتعديل الوحدة، بحيث تظهر أدوار العمارة المحددة فقط.
+- إضافة تحقق من جهة الخادم للتأكد من أن العمارة والدور تابعان للمشروع الحالي، وأن الدور تابع للعمارة المختارة.
+- إصلاح التهيئة المتأخرة لقوائم Alpine.js حتى يتم استرجاع العمارة والدور المحددين بشكل صحيح عند تعديل الوحدة.
+- ضبط القيم الافتراضية للوحدة الجديدة إلى 3 غرف، وحمامين، و3 تراسات.
+- تعديل حاسبة الأقساط لعرض الأدوار التي تحتوي على وحدات فقط، وعدم عرض الأدوار الفارغة.
+- توحيد بيانات وحدات فينسيا بحيث تكون كل وحدة مرتبطة بالمشروع والعمارة والدور الصحيحين، مع توحيد مواصفات الوحدات.
+- إضافة اختبارات وظيفية لنماذج الوحدات وفِلترة أدوار الحاسبة.
+- إضافة قواعد لتنظيف المستودع واستبعاد ملفات البيئة والاعتماديات والأصول المولدة وملفات التشغيل والسجلات والكاش من التحديثات المستقبلية.
 
-The Venecia inventory data is maintained through the project and unit management screens. Database changes should be delivered through migrations or controlled data-import scripts rather than committing production database contents or secrets.
+تتم إدارة مخزون فينسيا من خلال شاشات إدارة المشاريع والوحدات. يجب تنفيذ تغييرات قاعدة البيانات من خلال migrations أو سكربتات استيراد بيانات مضبوطة، وعدم رفع محتوى قاعدة بيانات الإنتاج أو أي مفاتيح وأسرار إلى المستودع.

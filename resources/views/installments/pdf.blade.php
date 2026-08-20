@@ -321,14 +321,8 @@
                     @endif
                     @if ((float) $result['discount_amount'] > 0)
                         <tr>
-                            <th>{{ __('Discount') }}</th>
+                            <th>{{ __('Discount') }}@if ((float) $result['discount_percent'] > 0)<span class="pct-badge">{{ number_format((float) $result['discount_percent'], 1) }}%</span>@endif</th>
                             <td class="ltr">- {{ number_format((float) $result['discount_amount'], 2) }} {{ __('ج.م') }}</td>
-                        </tr>
-                    @endif
-                    @if ((float) ($result['down_payment_discount'] ?? 0) > 0)
-                        <tr>
-                            <th>{{ __('Down Payment Discount') }} ({{ number_format((float) $result['down_payment_bonus_percent'], 2) }}%)</th>
-                            <td class="ltr">- {{ number_format((float) $result['down_payment_discount'], 2) }} {{ __('ج.م') }}</td>
                         </tr>
                     @endif
                     <tr class="total">

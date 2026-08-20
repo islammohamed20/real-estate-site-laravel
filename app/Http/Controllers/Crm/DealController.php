@@ -17,6 +17,7 @@ use App\Models\Lead;
 use App\Models\Project;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -162,6 +163,13 @@ class DealController extends Controller
 
             return $deal;
         });
+
+        // Push notification: new deal created
+        app(PushNotificationService::class)->notifyCrmEvent(
+            '💰 صفقة جديدة',
+            $deal->title.($deal->value ? ' — '.number_format((float) $deal->value) : ''),
+            '/real-statement-control/crm/deals/'.$deal->id
+        );
 
         return redirect()->route('dashboard.crm.deals.show', $deal)->with('success', __('Deal created.'));
     }

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\BlockSalesManagerFromWhatsApp;
 use App\Http\Middleware\EnsureActiveUser;
+use App\Http\Middleware\EnsureCustomerAuthenticated;
 use App\Http\Middleware\EnsureNotForceLoggedOut;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\SecurityHeaders;
@@ -36,6 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'active' => EnsureActiveUser::class,
+            'block_sales_manager_whatsapp' => BlockSalesManagerFromWhatsApp::class,
+            'customer.auth' => EnsureCustomerAuthenticated::class,
             '2fa' => RequireTwoFactor::class,
             'force_logout' => EnsureNotForceLoggedOut::class,
             'track_visitor' => TrackVisitor::class,
@@ -65,12 +69,53 @@ return Application::configure(basePath: dirname(__DIR__))
         // Fallback sync of incoming WhatsApp messages when webhooks are not registered.
         $schedule->command('whatsapp:sync')
             ->everyTwoMinutes()
+            ->when(fn () => \App\Models\AutomationSetting::enabled('whatsapp_sync_enabled'))
             ->withoutOverlapping();
 
         // Notify sales managers about unassigned conversations awaiting a reply for over an hour.
         $schedule->command('whatsapp:notify-unassigned --hours=1')
             ->everyFiveMinutes()
+            ->when(fn () => \App\Models\AutomationSetting::enabled('whatsapp_unassigned_enabled'))
             ->withoutOverlapping()
             ->onOneServer();
+
+        // Sales automations dispatcher — runs the enabled tasks (SLA, follow-ups,
+        // weekly report, scorecard) according to the Settings → Sales Automation page.
+        $schedule->command('sales:dispatch')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Follow-up reminder — 1 hour before each scheduled follow-up (every 15 min).
+        $schedule->command('follow-ups:remind --minutes=60')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Overdue follow-ups — push notification for delayed follow-ups (every 15 min).
+        $schedule->command('sales:notify-overdue-followups')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Unassigned leads — push notification for leads without sales rep (every 30 min).
+        $schedule->command('leads:notify-unassigned --hours=1')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Daily database backup — controlled from Maintenance Tools.
+        $schedule->command('backup:database --keep='.\App\Models\AutomationSetting::integer('database_backup_keep', 30))
+            ->dailyAt(\App\Models\AutomationSetting::get('database_backup_time', '02:30'))
+            ->when(fn () => \App\Models\AutomationSetting::enabled('database_backup_enabled'))
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Drain queued jobs (WhatsApp notifications, etc.) — controlled from Maintenance Tools.
+        $schedule->command('queue:work --stop-when-empty --tries=3 --timeout=60')
+            ->everyMinute()
+            ->when(fn () => \App\Models\AutomationSetting::enabled('queue_worker_enabled'))
+            ->withoutOverlapping()
+            ->runInBackground();
     })
     ->create();

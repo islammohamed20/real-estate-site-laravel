@@ -13,10 +13,12 @@ use App\Models\Offer;
 use App\Models\Project;
 use App\Models\Reservation;
 use App\Models\Unit;
+use App\Services\PushNotificationService;
 use App\Support\Features;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -63,6 +65,7 @@ class ProjectManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'alpha_dash', Rule::unique('projects', 'slug')],
             'code' => ['nullable', 'string', 'max:50'],
+            'price_per_meter' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
             'cover_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:8192'],
             'images' => ['nullable', 'array'],
@@ -108,24 +111,28 @@ class ProjectManagementController extends Controller
 
     public function edit(Project $project): View
     {
+        $project->load([
+            'buildings' => fn ($q) => $q->orderBy('sort_order')->with([
+                'floors' => fn ($fq) => $fq->orderByDesc('number')->with([
+                    'units' => fn ($uq) => $uq->orderBy('sort_order')->orderBy('unit_number')
+                ])
+            ]),
+            'units' => fn ($uq) => $uq->with(['building', 'floor'])->orderBy('sort_order')->orderBy('unit_number')
+        ]);
+
         return view('dashboard.projects.form', [
             'project' => $project,
             'statuses' => ['draft' => __('Draft'), 'launching' => __('Launching'), 'active' => __('Active'), 'sold' => __('Sold Out')],
-            'buildingsJson' => $project->buildings()
-                ->orderBy('sort_order')
-                ->get()
+            'buildingsJson' => $project->buildings
                 ->map(fn (Building $building) => [
                     'id' => $building->id,
                     'name' => $building->name,
-                    'floors_count' => max(1, $building->floors()->count()),
+                    'code' => $building->code,
+                    'floors_count' => max(1, $building->floors->count()),
                 ])
                 ->values()
                 ->all(),
-            'units' => $project->units()
-                ->with(['building', 'floor'])
-                ->orderBy('sort_order')
-                ->orderBy('unit_number')
-                ->get(),
+            'units' => $project->units,
         ]);
     }
 
@@ -134,7 +141,8 @@ class ProjectManagementController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'alpha_dash', Rule::unique('projects', 'slug')->ignore($project->id)],
-            'code' => ['required', 'string', 'max:50', Rule::unique('projects', 'code')->ignore($project->id)],
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('projects', 'code')->ignore($project->id)],
+            'price_per_meter' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
             'cover_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:8192'],
             'images' => ['nullable', 'array'],
@@ -189,6 +197,7 @@ class ProjectManagementController extends Controller
         $project->delete();
 
         // Soft-delete its buildings together; they come back when the project is restored.
+        Building::query()->where('project_id', $project->id)->update(['deleted_by' => auth()->id()]);
         Building::query()->where('project_id', $project->id)->delete();
 
         return redirect()->route('dashboard.projects.index')->with('status', __('Project deleted successfully.'));
@@ -199,6 +208,7 @@ class ProjectManagementController extends Controller
         return view('dashboard.projects.units.form', [
             'project' => $project,
             'unit' => null,
+            'buildings' => $project->buildings()->with('floors')->orderBy('sort_order')->get(),
             'floors' => $project->floors()->with('building')->orderBy('building_id')->orderBy('number')->get(),
             'statuses' => collect(UnitStatus::cases())->mapWithKeys(fn ($status) => [$status->value => __($status->label())]),
             'unitTypes' => $this->unitTypes(),
@@ -209,7 +219,18 @@ class ProjectManagementController extends Controller
     public function storeUnit(Request $request, Project $project): RedirectResponse
     {
         $validated = $request->validate([
-            'floor_id' => ['required', 'exists:floors,id'],
+            'building_id' => [
+                'required',
+                'integer',
+                Rule::exists('buildings', 'id')->where(fn ($query) => $query->where('project_id', $project->id)),
+            ],
+            'floor_id' => [
+                'required',
+                'integer',
+                Rule::exists('floors', 'id')->where(fn ($query) => $query
+                    ->where('project_id', $project->id)
+                    ->where('building_id', $request->input('building_id'))),
+            ],
             'unit_number' => [
                 'required',
                 'string',
@@ -230,14 +251,14 @@ class ProjectManagementController extends Controller
             'features.*' => ['string', 'max:255'],
             'map_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'map_lng' => ['nullable', 'numeric', 'between:-180,180'],
-            'bedrooms' => ['integer', 'min:0'],
-            'bathrooms' => ['integer', 'min:0'],
-            'area' => ['numeric', 'min:0'],
+            'bedrooms' => ['required', 'integer', 'min:0'],
+            'bathrooms' => ['required', 'integer', 'min:0'],
+            'area' => ['required', 'numeric', 'min:0'],
             'garden_area' => ['numeric', 'min:0'],
             'roof_area' => ['numeric', 'min:0'],
             'balcony_area' => ['numeric', 'min:0'],
             'terrace_count' => ['integer', 'min:0'],
-            'price_per_meter' => ['numeric', 'min:0'],
+            'price_per_meter' => ['required', 'numeric', 'min:0'],
             'garden_price' => ['numeric', 'min:0'],
             'roof_price' => ['numeric', 'min:0'],
             'excellence_percent' => ['numeric', 'min:0', 'max:100'],
@@ -281,6 +302,7 @@ class ProjectManagementController extends Controller
         return view('dashboard.projects.units.form', [
             'project' => $project,
             'unit' => $unit,
+            'buildings' => $project->buildings()->with('floors')->orderBy('sort_order')->get(),
             'floors' => $project->floors()->with('building')->orderBy('building_id')->orderBy('number')->get(),
             'statuses' => collect(UnitStatus::cases())->mapWithKeys(fn ($status) => [$status->value => __($status->label())]),
             'unitTypes' => $this->unitTypes(),
@@ -291,7 +313,18 @@ class ProjectManagementController extends Controller
     public function updateUnit(Request $request, Project $project, Unit $unit): RedirectResponse
     {
         $validated = $request->validate([
-            'floor_id' => ['required', 'exists:floors,id'],
+            'building_id' => [
+                'required',
+                'integer',
+                Rule::exists('buildings', 'id')->where(fn ($query) => $query->where('project_id', $project->id)),
+            ],
+            'floor_id' => [
+                'required',
+                'integer',
+                Rule::exists('floors', 'id')->where(fn ($query) => $query
+                    ->where('project_id', $project->id)
+                    ->where('building_id', $request->input('building_id'))),
+            ],
             'unit_number' => [
                 'required',
                 'string',
@@ -313,14 +346,14 @@ class ProjectManagementController extends Controller
             'features.*' => ['string', 'max:255'],
             'map_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'map_lng' => ['nullable', 'numeric', 'between:-180,180'],
-            'bedrooms' => ['integer', 'min:0'],
-            'bathrooms' => ['integer', 'min:0'],
-            'area' => ['numeric', 'min:0'],
+            'bedrooms' => ['required', 'integer', 'min:0'],
+            'bathrooms' => ['required', 'integer', 'min:0'],
+            'area' => ['required', 'numeric', 'min:0'],
             'garden_area' => ['numeric', 'min:0'],
             'roof_area' => ['numeric', 'min:0'],
             'balcony_area' => ['numeric', 'min:0'],
             'terrace_count' => ['integer', 'min:0'],
-            'price_per_meter' => ['numeric', 'min:0'],
+            'price_per_meter' => ['required', 'numeric', 'min:0'],
             'garden_price' => ['numeric', 'min:0'],
             'roof_price' => ['numeric', 'min:0'],
             'excellence_percent' => ['numeric', 'min:0', 'max:100'],
@@ -337,6 +370,9 @@ class ProjectManagementController extends Controller
         $floor = Floor::query()->findOrFail($validated['floor_id']);
         $building = $floor->building;
 
+        // The submitted building must match the building the floor belongs to.
+        abort_unless($building !== null && (int) $building->id === (int) $validated['building_id'], 422);
+
         $area = (float) $validated['area'];
         $pricePerMeter = (float) $validated['price_per_meter'];
         $gardenPrice = (float) ($validated['garden_price'] ?? 0);
@@ -347,6 +383,8 @@ class ProjectManagementController extends Controller
         $this->syncMainImage($request, $unit, 'thumbnail', 'thumbnail', "units/{$unit->id}/thumbnails", $addedImages);
         $this->handleFloorPlan($request, $unit);
 
+        $oldStatus = $unit->status->value;
+
         $unit->update([
             ...$validated,
             'project_id' => $project->id,
@@ -355,6 +393,17 @@ class ProjectManagementController extends Controller
             'floor_id' => $floor->id,
             'current_price' => $currentPrice,
         ]);
+
+        // Push notification: unit status changed to reserved/sold
+        $newStatus = $unit->status->value;
+        if ($oldStatus !== $newStatus && in_array($newStatus, ['reserved', 'sold'])) {
+            $statusLabel = $newStatus === 'reserved' ? 'تم الحجز' : 'تم البيع';
+            app(PushNotificationService::class)->notifyCrmEvent(
+                '🏢 '.$statusLabel,
+                $project->name.' — '.$unit->unit_number.' ('.$unit->status->label().')',
+                '/real-statement-control/projects/'.$project->id.'/edit'
+            );
+        }
 
         return redirect()->route('dashboard.projects.units.edit', [$project, $unit])->with('status', __('Unit updated successfully.'));
     }
@@ -401,6 +450,7 @@ class ProjectManagementController extends Controller
     public function restoreProject(Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
+        $this->assertOwnTrashedRecord($project);
 
         $project->restore();
 
@@ -413,6 +463,7 @@ class ProjectManagementController extends Controller
     public function forceDeleteProject(Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
+        $this->assertOwnTrashedRecord($project);
 
         if ($this->hasProjectRelatedRecords($project)) {
             return back()->withErrors([
@@ -428,6 +479,7 @@ class ProjectManagementController extends Controller
     public function restoreUnit(Unit $unit): RedirectResponse
     {
         $this->authorize('delete', $unit);
+        $this->assertOwnTrashedRecord($unit);
 
         $unit->restore();
 
@@ -445,6 +497,7 @@ class ProjectManagementController extends Controller
     public function forceDeleteUnit(Unit $unit): RedirectResponse
     {
         $this->authorize('delete', $unit);
+        $this->assertOwnTrashedRecord($unit);
 
         if ($this->hasUnitRelatedRecords($unit)) {
             return back()->withErrors([
@@ -460,6 +513,7 @@ class ProjectManagementController extends Controller
     public function restoreBuilding(Building $building): RedirectResponse
     {
         $this->authorize('delete', $building);
+        $this->assertOwnTrashedRecord($building);
 
         $building->restore();
 
@@ -474,6 +528,7 @@ class ProjectManagementController extends Controller
     public function forceDeleteBuilding(Building $building): RedirectResponse
     {
         $this->authorize('delete', $building);
+        $this->assertOwnTrashedRecord($building);
 
         if (Unit::withTrashed()->where('building_id', $building->id)->exists()) {
             return back()->withErrors([
@@ -731,11 +786,13 @@ class ProjectManagementController extends Controller
         }
 
         // Remove buildings that were removed from the form (only when they have no units).
-        Building::query()
+        $buildingsToDelete = Building::query()
             ->where('project_id', $project->id)
             ->whereNotIn('id', $keptBuildingIds)
-            ->whereDoesntHave('floors.units')
-            ->delete();
+            ->whereDoesntHave('floors.units');
+
+        $buildingsToDelete->update(['deleted_by' => auth()->id()]);
+        $buildingsToDelete->delete();
     }
 
     /**
@@ -790,6 +847,23 @@ class ProjectManagementController extends Controller
                 'name' => __('Ground'),
                 'sort_order' => 0,
             ]);
+        }
+    }
+
+    /**
+     * Ensure Data Entry users can only restore or permanently delete
+     * project-related records that they themselves deleted.
+     */
+    private function assertOwnTrashedRecord(Model $model): void
+    {
+        $user = auth()->user();
+
+        if ($user === null || $user->hasAnyRole(['Administrator', 'Sales Manager'])) {
+            return;
+        }
+
+        if ($user->hasRole('Data Entry') && (int) $model->deleted_by !== (int) $user->id) {
+            abort(403, __('You can only manage records that you deleted.'));
         }
     }
 }

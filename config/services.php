@@ -18,4 +18,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
         'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
+    'evolution' => [
+        'api_url' => env('EVOLUTION_API_URL'),
+        'api_key' => env('EVOLUTION_API_KEY'),
+        'instance_name' => env('EVOLUTION_INSTANCE_NAME'),
+        'sales_manager_whatsapp' => env('SALES_MANAGER_WHATSAPP'),
+    ],
 ];

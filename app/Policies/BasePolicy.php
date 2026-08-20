@@ -29,16 +29,16 @@ abstract class BasePolicy
 
     public function create(User $user, mixed $model = null): bool
     {
-        return $user->is_active && $user->hasAnyRole(['Administrator', 'Sales Manager', 'Sales Executive']);
+        return $user->is_active && $user->hasAnyRole(['Administrator', 'Sales Executive', 'Data Entry']);
     }
 
     public function update(User $user, mixed $model = null): bool
     {
-        return $user->is_active && $user->hasAnyRole(['Administrator', 'Sales Manager']);
+        return $user->is_active && $user->hasAnyRole(['Administrator', 'Data Entry']);
     }
 
     public function delete(User $user, mixed $model = null): bool
     {
-        return $user->is_active && $user->hasAnyRole(['Administrator', 'Sales Manager']);
+        return $user->is_active && $user->hasAnyRole(['Administrator', 'Data Entry']);
     }
 }

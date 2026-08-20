@@ -21,6 +21,8 @@ class CompanyProfileSeeder extends Seeder
                 'maintenance_percent' => 7.00,
                 'smtp_from_name' => config('app.name'),
                 'smtp_from_email' => config('mail.from.address'),
+                'seo_title' => 'Venecia Developments — شركة فينسيا للاستثمار والتطوير العقاري',
+                'seo_description' => 'رواد في صناعة التطوير العقاري والمجتمعات السكنية الفاخرة. نقدم حلولا معمارية متكاملة وتصاميم أيقونية بأرقى المواقع وأسهل أنظمة السداد.',
             ]
         );
     }

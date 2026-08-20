@@ -45,6 +45,10 @@
                     {{ __('Remember me') }}
                 </label>
 
+                <div class="stagger-item text-right" style="animation-delay:480ms">
+                    <a href="{{ route('password.request') }}" class="text-sm text-brand-400 transition hover:text-brand-300">{{ __('Forgot your password?') }}</a>
+                </div>
+
                 <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:520ms">{{ __('Sign in') }}</button>
             </form>
         </div>

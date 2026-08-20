@@ -25,10 +25,8 @@ return new class extends Migration
         }
 
         $grant = static function (string $role, array $perms): void {
-            $r = Role::findByName($role, 'web');
-            if ($r !== null) {
-                $r->givePermissionTo($perms);
-            }
+            $r = Role::findOrCreate($role, 'web');
+            $r->givePermissionTo($perms);
         };
 
         $grant('Administrator', $permissions);
@@ -47,8 +45,7 @@ return new class extends Migration
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         foreach (['view whatsapp', 'view all whatsapp conversations', 'reply whatsapp', 'assign whatsapp'] as $permission) {
-            $p = Permission::findByName($permission, 'web');
-            $p?->delete();
+            Permission::query()->where('name', $permission)->where('guard_name', 'web')->delete();
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

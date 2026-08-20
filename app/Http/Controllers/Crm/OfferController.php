@@ -14,6 +14,7 @@ use App\Models\Project;
 use App\Models\Unit;
 use App\Models\User;
 use App\Notifications\CrmActivityNotification;
+use App\Services\PushNotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -70,7 +71,7 @@ class OfferController extends Controller
 
         OfferCreated::dispatch($offer);
 
-        CrmActivityNotification::notifyManagers(new CrmActivityNotification(
+        CrmActivityNotification::notifyRelevant(new CrmActivityNotification(
             'offer',
             [
                 'offer_number' => $offer->offer_number,
@@ -79,7 +80,9 @@ class OfferController extends Controller
                 'action_url' => route('dashboard.crm.offers.show', $offer),
             ],
             auth()->user()?->name,
-        ));
+        ), auth()->user());
+
+        app(PushNotificationService::class)->notifyCrmEvent('💨 عرض جديد', $offer->title ?? 'New offer', '/real-statement-control/crm/offers/'.$offer->id);
 
         return redirect()->route('dashboard.crm.offers.show', $offer)
             ->with('status', __('Offer created successfully.'));

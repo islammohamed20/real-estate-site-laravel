@@ -66,6 +66,11 @@
                         @error('email')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
                     </div>
                     <div>
+                        <label for="lead-whatsapp" class="mb-1 block text-sm font-medium text-slate-300">{{ __('WhatsApp') }}</label>
+                        <input id="lead-whatsapp" class="app-input w-full" type="tel" inputmode="tel" name="whatsapp" placeholder="{{ __('e.g. 0100 123 4567') }}" value="{{ old('whatsapp') }}">
+                        @error('whatsapp')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
                         <label for="lead-occupation" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Occupation') }}</label>
                         <input id="lead-occupation" class="app-input w-full" name="occupation" placeholder="{{ __('e.g. Engineer') }}" value="{{ old('occupation') }}">
                         @error('occupation')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
@@ -84,6 +89,24 @@
                         @error('address')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
                     </div>
                     <div>
+                        <label for="lead-stage" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Stage') }}</label>
+                        <select id="lead-stage" name="stage" class="app-input w-full">
+                            @foreach ($stages as $value => $label)
+                                <option value="{{ $value }}" @selected(old('stage', 'new') === $value)>{{ __($label) }}</option>
+                            @endforeach
+                        </select>
+                        @error('stage')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-priority" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Priority') }}</label>
+                        <select id="lead-priority" name="priority" class="app-input w-full">
+                            @foreach ($priorities as $value => $label)
+                                <option value="{{ $value }}" @selected(old('priority', 'normal') === $value)>{{ __($label) }}</option>
+                            @endforeach
+                        </select>
+                        @error('priority')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
                         <label for="lead-assigned-to" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Assign to sales') }}</label>
                         <select id="lead-assigned-to" name="assigned_to" class="app-input w-full">
                             <option value="">{{ __('Unassigned') }}</option>
@@ -97,6 +120,11 @@
                         <label for="lead-follow-up" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Follow up at') }}</label>
                         <input id="lead-follow-up" class="app-input w-full" type="datetime-local" name="follow_up_at" min="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('follow_up_at') }}">
                         @error('follow_up_at')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-campaign" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Campaign') }}</label>
+                        <input id="lead-campaign" class="app-input w-full" name="campaign" placeholder="{{ __('e.g. Facebook ad, Referral') }}" value="{{ old('campaign') }}">
+                        @error('campaign')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="lead-project" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Interested project') }}</label>
@@ -122,19 +150,57 @@
                         </select>
                         @error('unit_id')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
                     </div>
-                    <div class="sm:col-span-2">
-                        <label for="lead-source" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Source') }}</label>
-                        <input id="lead-source" class="app-input w-full" name="source" list="lead-source-list" placeholder="{{ __('e.g. referral, website') }}" value="{{ old('source') }}">
-                        <datalist id="lead-source-list">
-                            <option value="website">
-                            <option value="referral">
-                            <option value="walk-in">
-                            <option value="phone call">
-                            <option value="social media">
-                            <option value="property finder">
-                            <option value="dashboard">
+                    <div>
+                        <label for="lead-source-id" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Source') }}</label>
+                        <select id="lead-source-id" name="lead_source_id" class="app-input w-full">
+                            <option value="">{{ __('Select source') }}</option>
+                            @foreach ($sources as $id => $name)
+                                <option value="{{ $id }}" @selected(old('lead_source_id') == $id)>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                        @error('lead_source_id')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-unit-type" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Unit type') }}</label>
+                        <input id="lead-unit-type" class="app-input w-full" name="unit_type" list="lead-unit-type-list" placeholder="{{ __('e.g. Apartment, Villa') }}" value="{{ old('unit_type') }}">
+                        <datalist id="lead-unit-type-list">
+                            <option value="Apartment">
+                            <option value="Villa">
+                            <option value="Penthouse">
+                            <option value="Duplex">
+                            <option value="Studio">
+                            <option value="Townhouse">
+                            <option value="Chalet">
+                            <option value="Office">
+                            <option value="Shop">
+                            <option value="Land">
+                            <option value="Other">
                         </datalist>
-                        @error('source')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                        @error('unit_type')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-bedrooms" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Bedrooms') }}</label>
+                        <input id="lead-bedrooms" class="app-input w-full" type="number" min="0" name="bedrooms" value="{{ old('bedrooms') }}">
+                        @error('bedrooms')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-required-area" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Required area') }} ({{ __('m²') }})</label>
+                        <input id="lead-required-area" class="app-input w-full" type="number" step="0.01" min="0" name="required_area" value="{{ old('required_area') }}">
+                        @error('required_area')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="lead-payment-plan" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Preferred payment plan') }}</label>
+                        <input id="lead-payment-plan" class="app-input w-full" name="preferred_payment_plan" value="{{ old('preferred_payment_plan') }}">
+                        @error('preferred_payment_plan')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="lead-tags" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Tags') }}</label>
+                        <select id="lead-tags" name="tags[]" multiple class="app-input min-h-24 w-full">
+                            @foreach ($tags as $id => $name)
+                                <option value="{{ $id }}" @selected(in_array($id, old('tags', [])))>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                        @error('tags')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
                     </div>
                     <div class="sm:col-span-2">
                         <label for="lead-message" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Notes / request details') }}</label>
@@ -338,14 +404,14 @@
                     box.style.display = 'none';
                     return;
                 }
-                let html = '<div style="margin-top:0.6rem;border:1px solid rgb(245 158 11 / 0.35);background:rgb(245 158 11 / 0.08);border-radius:0.9rem;padding:0.8rem 1rem;color:rgb(253 230 138 / 0.95);font-size:0.78rem;line-height:1.6;">';
+                let html = '<div style="margin-top:0.6rem;border:1px solid #f59e0b;background:#fef3c7;border-radius:0.9rem;padding:0.8rem 1rem;color:#78350f;font-size:0.78rem;line-height:1.6;">';
                 html += '<div style="display:flex;align-items:flex-start;gap:0.6rem;"><span style="font-size:1rem;">⚠️</span><div style="flex:1;min-width:0;">';
                 html += '<p style="font-weight:700;margin-bottom:0.35rem;">{{ __('This phone number already exists in the CRM.') }}</p>';
 
                 if (leads.length > 0) {
                     html += '<p style="opacity:0.9;">{{ __('Existing leads') }}:</p><ul style="list-style:none;margin:0 0 0.4rem;padding:0;display:flex;flex-direction:column;gap:0.25rem;">';
                     leads.forEach(l => {
-                        html += '<li><a href="' + l.url + '" target="_blank" style="color:#7dd3fc;text-decoration:underline;">👤 ' + l.name + ' — ' + l.phone + (l.stage ? ' (' + l.stage + ')' : '') + '</a></li>';
+                        html += '<li><a href="' + l.url + '" target="_blank" style="color:#0369a1;text-decoration:underline;">👤 ' + l.name + ' — ' + l.phone + (l.stage ? ' (' + l.stage + ')' : '') + '</a></li>';
                     });
                     html += '</ul>';
                 }
@@ -353,7 +419,7 @@
                 if (customers.length > 0) {
                     html += '<p style="opacity:0.9;">{{ __('Existing customers') }}:</p><ul style="list-style:none;margin:0 0 0.4rem;padding:0;display:flex;flex-direction:column;gap:0.25rem;">';
                     customers.forEach(c => {
-                        html += '<li><a href="' + c.url + '" target="_blank" style="color:#6ee7b7;text-decoration:underline;">🏢 ' + c.name + ' — ' + c.phone + '</a></li>';
+                        html += '<li><a href="' + c.url + '" target="_blank" style="color:#047857;text-decoration:underline;">🏢 ' + c.name + ' — ' + c.phone + '</a></li>';
                     });
                     html += '</ul>';
                 }

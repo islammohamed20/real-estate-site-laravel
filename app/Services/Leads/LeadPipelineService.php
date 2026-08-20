@@ -29,7 +29,7 @@ class LeadPipelineService
             ]);
 
             LeadStageChanged::dispatch($lead, $previousStage, $stage, $actor);
-            LeadStageUpdated::dispatch($lead, $previousStage, $stage->value);
+            LeadStageUpdated::dispatch($lead, $previousStage?->value, $stage->value);
 
             return $lead->refresh();
         });

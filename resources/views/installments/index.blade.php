@@ -52,6 +52,7 @@
             unitId: '{{ old('unit_id', request('unit_id')) }}',
             projectId: '{{ old('project_id', $preselectedProjectId) }}',
             buildingId: '{{ old('building_id', $preselectedBuildingId) }}',
+            floorId: '{{ old('floor_id') }}',
             templateId: '{{ old('installment_template_id', $template?->id) }}',
             installmentLabel: @js(__('Installment')),
             buildings: {{ Js::from($buildings->map(fn ($b) => [
@@ -61,13 +62,23 @@
                 'project_id' => (int) $b->project_id,
                 'project_name' => $b->project?->name ?? '',
             ])->values()->all()) }},
+            floors: {{ Js::from($floors->map(fn ($f) => [
+                'id' => (int) $f->id,
+                'name' => $f->name ?: ($f->number !== null ? __('Floor :number', ['number' => $f->number]) : ''),
+                'number' => $f->number,
+                'project_id' => (int) $f->project_id,
+                'building_id' => (int) ($f->building_id ?? 0),
+                'building_name' => $f->building?->name ?? '',
+            ])->values()->all()) }},
             units: {{ Js::from($units->map(fn ($u) => [
                 'id' => (int) $u->id,
                 'unit_number' => $u->unit_number,
                 'project_id' => (int) $u->project_id,
                 'building_id' => (int) ($u->building_id ?? 0),
+                'floor_id' => (int) ($u->floor_id ?? 0),
                 'project_name' => $u->project?->name ?? '',
                 'building_name' => $u->building?->name ?? '',
+                'floor_name' => $u->floor?->name ?? '',
                 'area' => (float) $u->area,
                 'price_per_meter' => (float) $u->price_per_meter,
                 'garden_price' => (float) $u->garden_price,
@@ -94,6 +105,18 @@
                 if (! this.projectId) return this.buildings;
                 return this.buildings.filter(b => Number(b.project_id) === Number(this.projectId));
             },
+            get filteredFloors() {
+                if (! this.projectId) return this.floors;
+                return this.floors.filter(f => {
+                    if (Number(f.project_id) !== Number(this.projectId)) {
+                        return false;
+                    }
+                    if (! this.buildingId) {
+                        return true;
+                    }
+                    return Number(f.building_id) === Number(this.buildingId);
+                });
+            },
             get unitUnavailableMessage() {
                 if (! this.selectedUnit) return '';
                 return this.unavailableMessage
@@ -107,11 +130,15 @@
                         return false;
                     }
 
-                    if (! this.buildingId) {
-                        return true;
+                    if (this.buildingId && Number(u.building_id) !== Number(this.buildingId)) {
+                        return false;
                     }
 
-                    return Number(u.building_id) === Number(this.buildingId);
+                    if (this.floorId && Number(u.floor_id) !== Number(this.floorId)) {
+                        return false;
+                    }
+
+                    return true;
                 });
             },
             selectUnit() {
@@ -119,6 +146,7 @@
                 if (u) {
                     this.projectId = String(u.project_id);
                     this.buildingId = String(u.building_id || '');
+                    this.floorId = String(u.floor_id || '');
                     this.area = u.area;
                     this.pricePerMeter = u.price_per_meter;
                     this.gardenPrice = u.garden_price;
@@ -139,6 +167,9 @@
                     if (this.$refs.buildingSelect) {
                         this.$refs.buildingSelect.value = this.buildingId || '';
                     }
+                    if (this.$refs.floorSelect) {
+                        this.$refs.floorSelect.value = this.floorId || '';
+                    }
                     if (this.$refs.unitSelect) {
                         this.$refs.unitSelect.value = this.unitId || '';
                     }
@@ -154,6 +185,7 @@
 
                 if (b && Number(b.project_id) !== Number(this.projectId)) {
                     this.buildingId = '';
+                    this.floorId = '';
                 }
 
                 if (! u || Number(u.project_id) !== Number(this.projectId) || (this.buildingId && Number(u.building_id) !== Number(this.buildingId))) {
@@ -161,8 +193,18 @@
                 }
             },
             onBuildingChange() {
+                const f = this.floors.find(x => Number(x.id) === Number(this.floorId));
+                if (f && Number(f.building_id) !== Number(this.buildingId)) {
+                    this.floorId = '';
+                }
                 const u = this.units.find(x => Number(x.id) === Number(this.unitId));
                 if (! u || Number(u.building_id) !== Number(this.buildingId)) {
+                    this.unitId = '';
+                }
+            },
+            onFloorChange() {
+                const u = this.units.find(x => Number(x.id) === Number(this.unitId));
+                if (! u || Number(u.floor_id) !== Number(this.floorId)) {
                     this.unitId = '';
                 }
             },
@@ -171,25 +213,28 @@
             get excellenceAmount() { return this.basePrice * Number(this.excellencePercent) / 100; },
             get basePriceWithExcellence() { return this.basePrice + this.excellenceAmount; },
             get discountPercent() {
-                if (this.isCash) return 27.55;
-                const y = Number(this.installmentYears);
-                if (y >= 4) return 0;
-                if (y >= 3) return 7.14;
-                if (y >= 2) return 12.76;
-                return 23.47;
+                // Excel model: every point above the 10% down-payment baseline
+                // earns a 30% discount point; cash = 100% down → 27%.
+                const downPct = this.isCash ? 100 : (
+                    Number(this.downPayment) > 0 && this.basePriceWithExcellence > 0
+                        ? Number(this.downPayment) / this.basePriceWithExcellence * 100
+                        : Number(this.downPaymentPercent)
+                );
+                return Math.max(0, downPct - 10) * 0.30;
             },
-            get discountAmount() { return (Number(this.area) * Number(this.pricePerMeter)) * this.discountPercent / 100; },
+            get discountAmount() { return this.basePriceWithExcellence * this.discountPercent / 100; },
             get priceAfterTermDiscount() { return Math.max(0, this.basePriceWithExcellence - this.discountAmount); },
-            get downPaymentBonusPercent() { return this.isCash ? 0 : Math.max(0, Math.min(Number(this.downPaymentPercent) - 10, 20)); },
-            get downPaymentDiscount() { return this.priceAfterTermDiscount * this.downPaymentBonusPercent / 100; },
-            get finalPrice() { return Math.max(0, this.priceAfterTermDiscount - this.downPaymentDiscount); },
+            get downPaymentBonusPercent() { return this.discountPercent; },
+            get downPaymentDiscount() { return this.discountAmount; },
+            get finalPrice() { return this.priceAfterTermDiscount; },
             get maintenanceAmount() { return this.finalPrice * Number(this.maintenancePercent) / 100; },
             get monthsPerInstallment() { return this.installmentType === 'monthly' ? 1 : (this.installmentType === 'quarterly' ? 3 : 6); },
             get installmentCount() { return this.isCash ? 0 : Math.max(1, Math.round(Number(this.installmentYears) * 12 / this.monthsPerInstallment)); },
-            get computedDownPayment() { return this.isCash ? this.finalPrice : (Number(this.downPayment) > 0 ? Number(this.downPayment) : (this.finalPrice * Number(this.downPaymentPercent) / 100)); },
+            get computedDownPayment() { return this.isCash ? this.finalPrice : (Number(this.downPayment) > 0 ? Number(this.downPayment) : (this.basePriceWithExcellence * Number(this.downPaymentPercent) / 100)); },
             get remaining() { return Math.max(0, this.finalPrice - this.computedDownPayment); },
             get installmentAmount() { return Number(this.installmentCount) > 0 ? (this.remaining / Number(this.installmentCount)) : 0; },
             money(value) { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(value); },
+            pct(value) { return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 }).format(Number(value)) + '%'; },
         }"
     >
         @if ($errors->any())
@@ -238,7 +283,7 @@
                         <h2 class="text-lg font-semibold text-white">{{ __('1. Unit Selection') }}</h2>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <label class="space-y-2">
                             <span class="text-sm font-medium text-slate-300">{{ __('Project') }}</span>
                             <select class="app-select" x-model="projectId" name="project_id" @change="onProjectChange()">
@@ -258,11 +303,20 @@
                             </select>
                         </label>
                         <label class="space-y-2">
+                            <span class="text-sm font-medium text-slate-300">{{ __('Floor') }}</span>
+                            <select x-ref="floorSelect" class="app-select" x-model="floorId" name="floor_id" @change="onFloorChange()">
+                                <option value="">{{ __('Choose a floor') }}</option>
+                                <template x-for="floor in filteredFloors" :key="floor.id">
+                                    <option :value="floor.id" x-text="floor.building_name ? floor.name + ' · ' + floor.building_name : floor.name"></option>
+                                </template>
+                            </select>
+                        </label>
+                        <label class="space-y-2">
                             <span class="text-sm font-medium text-slate-300">{{ __('Unit') }}</span>
                             <select x-ref="unitSelect" class="app-select" x-model="unitId" name="unit_id" @change="selectUnit()">
                                 <option value="">{{ __('Choose a unit') }}</option>
                                 <template x-for="u in filteredUnits" :key="u.id">
-                                    <option :value="u.id" x-text="u.unit_number + ' · ' + (u.building_name || u.project_name)"></option>
+                                    <option :value="u.id" x-text="u.unit_number + ' · ' + (u.floor_name || u.building_name || u.project_name)"></option>
                                 </template>
                             </select>
                         </label>
@@ -392,6 +446,10 @@
                     <h2 class="text-lg font-bold text-white">{{ __('Real-time Summary') }}</h2>
                     
                     <div class="space-y-4">
+                        <div class="flex justify-between border-b border-white/5 pb-3">
+                            <span class="text-sm text-slate-400">{{ __('Unit Price') }}</span>
+                            <span class="font-semibold text-white" x-text="money(basePrice)"></span>
+                        </div>
                         {{-- For the customer, hide the Excellence row when the unit has no excellence % --}}
                         <template x-if="isDashboard || excellencePercent > 0">
                             <div class="flex justify-between border-b border-white/5 pb-3">
@@ -399,17 +457,10 @@
                                 <span class="font-semibold text-brand-400" x-text="'+' + money(excellenceAmount)"></span>
                             </div>
                         </template>
-                        <div class="flex justify-between border-b border-white/5 pb-3">
-                            <span class="text-sm text-slate-400">{{ __('Discount') }}</span>
+                        <div class="flex justify-between border-b border-white/5 pb-3" x-show="discountPercent > 0" x-cloak>
+                            <span class="text-sm text-slate-400">{{ __('Discount') }} <span class="text-xs text-emerald-400/70" x-text="'(' + pct(discountPercent) + ')'"></span></span>
                             <span class="font-semibold text-emerald-400" x-text="'-' + money(discountAmount)"></span>
                         </div>
-                        {{-- Extra discount when the down payment exceeds 10% (site + dashboard) --}}
-                        <template x-if="!isCash && downPaymentBonusPercent > 0">
-                            <div class="flex justify-between border-b border-white/5 pb-3">
-                                <span class="text-sm text-slate-400">{{ __('Down Payment Discount') }} <span class="text-xs text-emerald-400/70" x-text="'(' + money(downPaymentBonusPercent) + '%)'"></span></span>
-                                <span class="font-semibold text-emerald-400" x-text="'-' + money(downPaymentDiscount)"></span>
-                            </div>
-                        </template>
                         <div class="flex justify-between border-b border-white/5 pb-3">
                             <span class="text-sm text-slate-400">{{ __('Net Total') }}</span>
                             <span class="text-xl font-bold text-emerald-400" x-text="money(finalPrice)"></span>

@@ -11,6 +11,12 @@ class CompanyProfile extends Model
 {
     use HasFactory;
 
+    public const DEFAULT_EVOLUTION_API_URL = 'http://144.91.79.64:8096';
+
+    public const DEFAULT_EVOLUTION_INSTANCE_NAME = 'Venecia Developments';
+
+    public const DEFAULT_EVOLUTION_DASHBOARD_URL = 'http://144.91.79.64:8096/manager/instance/9102b9ab-6c2a-49d0-96f9-cd6c7cd11620/dashboard';
+
     protected $fillable = [
         'name',
         'legal_name',
@@ -26,6 +32,11 @@ class CompanyProfile extends Model
         'phone',
         'email',
         'website',
+        'facebook_url',
+        'instagram_url',
+        'seo_title',
+        'seo_description',
+        'seo_image_path',
         'currency_code',
         'default_language',
         'available_features',
@@ -38,6 +49,10 @@ class CompanyProfile extends Model
         'evolution_api_url',
         'evolution_api_key',
         'evolution_instance_name',
+        'evolution_dashboard_url',
+        'evolution_outgoing_color',
+        'evolution_incoming_color',
+        'evolution_chat_background',
     ];
 
     protected function casts(): array

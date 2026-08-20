@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Traits\TracksDeletedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,11 +14,15 @@ class Project extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use TracksDeletedBy {
+        TracksDeletedBy::runSoftDelete insteadof SoftDeletes;
+    }
 
     protected $fillable = [
         'name',
         'slug',
         'code',
+        'price_per_meter',
         'description',
         'images',
         'cover_image_path',
@@ -38,6 +43,7 @@ class Project extends Model
             'images' => 'array',
             'map_lat' => 'decimal:7',
             'map_lng' => 'decimal:7',
+            'price_per_meter' => 'decimal:2',
             'featured' => 'boolean',
             'published_at' => 'datetime',
         ];

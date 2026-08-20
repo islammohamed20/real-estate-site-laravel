@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\UnitStatus;
+use App\Models\Traits\TracksDeletedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,9 @@ class Unit extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use TracksDeletedBy {
+        TracksDeletedBy::runSoftDelete insteadof SoftDeletes;
+    }
 
     protected $fillable = [
         'project_id',

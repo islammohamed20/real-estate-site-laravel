@@ -18,8 +18,8 @@ use Illuminate\Notifications\Notifiable;
 class Customer extends Authenticatable
 {
     use HasFactory;
-    use SoftDeletes;
     use Notifiable;
+    use SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -33,6 +33,7 @@ class Customer extends Authenticatable
         'budget_min',
         'budget_max',
         'notes',
+        'preferred_locale',
         'source',
     ];
 
@@ -48,6 +49,13 @@ class Customer extends Authenticatable
             'budget_min' => 'decimal:2',
             'budget_max' => 'decimal:2',
             'password' => 'hashed',
+            'email_verified_at' => 'datetime',
+            'otp_expires_at' => 'datetime',
+            'otp_sent_at' => 'datetime',
+            'otp_attempts' => 'integer',
+            'whatsapp_two_factor_enabled' => 'boolean',
+            'authenticator_two_factor_enabled' => 'boolean',
+            'two_factor_recovery_codes' => 'array',
         ];
     }
 

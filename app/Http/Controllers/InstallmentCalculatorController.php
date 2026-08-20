@@ -10,6 +10,7 @@ use App\Http\Requests\InstallmentCalculatorRequest;
 use App\Models\Building;
 use App\Models\CompanyProfile;
 use App\Models\Customer;
+use App\Models\Floor;
 use App\Models\InstallmentPlan;
 use App\Models\InstallmentPlanItem;
 use App\Models\Lead;
@@ -36,6 +37,12 @@ class InstallmentCalculatorController extends Controller
         $isDashboard = $request->routeIs('dashboard.*');
         $units = Unit::query()->with(['project', 'floor', 'building'])->orderBy('unit_number')->limit(200)->get();
         $buildings = Building::query()->with('project')->orderBy('name')->get();
+        $floors = Floor::query()
+            ->whereHas('units')
+            ->with('building:id,name,project_id')
+            ->orderBy('sort_order')
+            ->orderBy('number')
+            ->get();
 
         $unitId = $request->integer('unit_id');
 
@@ -56,6 +63,7 @@ class InstallmentCalculatorController extends Controller
             'templates' => $templates->all(),
             'projects' => Project::query()->orderBy('name')->get(),
             'buildings' => $buildings,
+            'floors' => $floors,
             'units' => $units,
             'companyProfile' => $companyProfile,
         ]);
@@ -162,9 +170,8 @@ class InstallmentCalculatorController extends Controller
             'name' => $this->planName($unit, (int) $validated['customer_id']),
             'status' => 'active',
             'base_price' => $result['base_price'],
-            // Store the total discount (term + down-payment bonus) so the saved
-            // plan reconciles with its final price.
-            'discount_amount' => $result['discount_amount'] + $result['down_payment_discount'],
+            // Store the total discount so the saved plan reconciles with its final price.
+            'discount_amount' => $result['discount_amount'],
             'final_price' => $result['final_price'],
             'maintenance_deposit' => $result['maintenance_deposit'],
             'down_payment' => $result['down_payment'],
@@ -192,7 +199,7 @@ class InstallmentCalculatorController extends Controller
             Offer::query()->where('id', $validated['offer_id'])->update(['installment_plan_id' => $plan->id]);
         }
 
-        CrmActivityNotification::notifyManagers(new CrmActivityNotification(
+        CrmActivityNotification::notifyRelevant(new CrmActivityNotification(
             'plan',
             [
                 'customer_name' => Customer::query()->find($validated['customer_id'])?->name ?? __('Unknown customer'),
@@ -201,7 +208,7 @@ class InstallmentCalculatorController extends Controller
                 'action_url' => route('dashboard.crm.plans.show', $plan),
             ],
             auth('web')->user()?->name,
-        ));
+        ), auth('web')->user());
 
         $message = __('Installment plan saved to CRM successfully.');
 

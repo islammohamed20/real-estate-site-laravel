@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Banner;
+use App\Models\HomeSection;
 use App\Models\Project;
 use App\Models\Unit;
 use App\Repositories\Interfaces\ProjectRepositoryInterface;
@@ -19,7 +20,15 @@ class PublicWebsiteController extends Controller
     {
         $banners = Banner::query()->active()->orderBy('sort_order')->orderBy('id')->get();
 
+        $homeSections = HomeSection::query()->orderBy('sort_order')->orderBy('id')->get()->keyBy('key');
+
         return view('public.home', [
+            'homeSections' => $homeSections,
+            'hero' => $homeSections['hero'] ?? null,
+            'pillars' => $homeSections['pillars'] ?? null,
+            'projectsSection' => $homeSections['projects'] ?? null,
+            'unitsSection' => $homeSections['units'] ?? null,
+            'calculator' => $homeSections['calculator'] ?? null,
             'banners' => $banners,
             'projects' => $projects->all()->take(6),
             'featuredUnits' => Unit::query()
@@ -44,14 +53,34 @@ class PublicWebsiteController extends Controller
             'search' => $request->string('q')->trim()->toString(),
             'unit_type' => $request->string('type')->trim()->toString(),
             'bedrooms' => $request->string('rooms')->trim()->toString(),
+            'building_id' => $request->string('building')->trim()->toString(),
         ]);
+
+        $buildings = \App\Models\Building::query()
+            ->whereHas('project', fn ($q) => $q->where('status', 'active'))
+            ->with(['project:id,name,slug'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'project_id']);
+
+        $unitTypes = \App\Models\Unit::query()
+            ->where('hidden_from_website', false)
+            ->whereNotNull('unit_type')
+            ->where('unit_type', '!=', '')
+            ->distinct()
+            ->orderBy('unit_type')
+            ->pluck('unit_type')
+            ->values()
+            ->all();
 
         return view('public.projects.index', [
             'units' => $units->paginate(12, $filters),
             'projects' => $projects->all(),
+            'buildings' => $buildings,
+            'unitTypes' => $unitTypes,
             'currentSearch' => $request->string('q')->toString(),
             'currentType' => $request->string('type')->toString(),
             'currentRooms' => $request->string('rooms')->toString(),
+            'currentBuilding' => $request->string('building')->toString(),
             'totalUnitCount' => Unit::query()->where('hidden_from_website', false)->count(),
         ]);
     }

@@ -18,20 +18,23 @@ export function setupInstallPrompt() {
     let deferredPrompt = null;
 
     window.addEventListener('beforeinstallprompt', (event) => {
-        event.preventDefault();
+        // Store the event for later use, but DON'T preventDefault
+        // so the browser can show its native install banner if desired.
+        // If you want a custom install button, call deferredPrompt.prompt() on click.
         deferredPrompt = event;
         window.dispatchEvent(new CustomEvent('pwa-install-ready'));
     });
 
-    window.addEventListener('appinstall', async () => {
+    // Expose a global function for custom install buttons to use
+    window.pwaPromptInstall = async () => {
         if (!deferredPrompt) {
-            return;
+            return false;
         }
-
         deferredPrompt.prompt();
         await deferredPrompt.userChoice;
         deferredPrompt = null;
-    });
+        return true;
+    };
 }
 
 export function setupOfflineDetection() {

@@ -1,6 +1,7 @@
 @extends('layouts.public')
 
 @section('content')
+    @if(!$hero || $hero->is_active)
     {{-- Hero Section --}}
     <section class="relative overflow-hidden rounded-3xl bg-gradient-to-b from-brand-950 via-slate-900 to-slate-950 px-6 py-12 text-center shadow-2xl sm:py-20 lg:py-24">
         <div class="pointer-events-none absolute inset-0 bg-grid opacity-30"></div>
@@ -14,37 +15,15 @@
                 </svg> {{ __('شركة فينسيا للاستثمار والتطوير العقاري · Venecia Developments') }}
             </span>
 
-            {{-- Main Headline --}}
-            <h1 class="text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-tight">
-                {{ __('ابتكار العمران.. وصناعة مجتمعات') }}
-                <span class="bg-gradient-to-r from-brand-400 via-indigo-300 to-amber-300 bg-clip-text text-transparent">
-                    {{ __('سكنية فاخرة') }}
-                </span>
-                {{ __('بمواصفات عالمية') }}
-            </h1>
+            {{-- Promotional Banners Slider (replaces headline) --}}
+            <div class="mx-auto w-full max-w-4xl">
+                @include('public.partials.banner-slider', ['banners' => $banners ?? collect()])
+            </div>
 
             {{-- Subtitle --}}
             <p class="mx-auto max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base sm:leading-8">
-                {{ __('نبتكر حلولاً معمارية متكاملة تدمج بين الرفاهية والسكن الراقي في أرقى المواقع الحيوية، مع أنظمة سداد مرنة وتقسيط مباشر يصل إلى 8 سنوات بدون فوائد.') }}
+                {{ $hero?->content ?? __('نبتكر حلولاً معمارية متكاملة تدمج بين الرفاهية والسكن الراقي في أرقى المواقع الحيوية، مع أنظمة سداد مرنة وتقسيط مباشر يصل إلى 8 سنوات بدون فوائد.') }}
             </p>
-
-            {{-- Search Bar --}}
-            <form action="{{ route('public.projects.index') }}" method="GET" role="search" class="mx-auto mt-8 flex max-w-2xl items-center gap-2 rounded-3xl border border-white/15 bg-slate-900/80 p-2 shadow-2xl backdrop-blur-2xl">
-                <svg class="ms-3 h-5 w-5 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="11" cy="11" r="7" stroke-width="1.8"/>
-                    <path d="m20 20-3.5-3.5" stroke-width="1.8" stroke-linecap="round"/>
-                </svg>
-                <input
-                    type="search"
-                    name="q"
-                    value="{{ request('q') }}"
-                    placeholder="{{ __('ابحث عن شقة، فيلا، مشروع، أو مدينة (الشيخ زايد، التجمع...)...') }}"
-                    class="w-full bg-transparent px-2 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
-                >
-                <button type="submit" class="app-button shrink-0 text-sm px-6 py-2.5">
-                    {{ __('بحث سريع') }}
-                </button>
-            </form>
 
             {{-- Stats Counters --}}
             <dl class="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-4 border-t border-white/10 pt-8 sm:grid-cols-4">
@@ -67,13 +46,26 @@
             </dl>
         </div>
     </section>
+    @endif
 
-    {{-- Promotional Banners Slider --}}
-    @include('public.partials.banner-slider', ['banners' => $banners ?? collect()])
-
+    @if(!$pillars || $pillars->is_active)
     {{-- Venecia Strategic Pillars / Values Section --}}
-    <section class="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="app-card card-hover space-y-3 p-6">
+    <section class="mt-16">
+        @if($pillars?->title || $pillars?->subtitle || $pillars?->content)
+            <div class="mb-8 max-w-2xl">
+                @if($pillars?->subtitle)
+                    <p class="mobile-section-title">{{ $pillars->subtitle }}</p>
+                @endif
+                @if($pillars?->title)
+                    <h2 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ $pillars->title }}</h2>
+                @endif
+                @if($pillars?->content)
+                    <p class="mt-2 text-sm leading-relaxed text-slate-400 sm:text-base">{{ $pillars->content }}</p>
+                @endif
+            </div>
+        @endif
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="app-card card-hover space-y-3 p-6">
             <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500/15 text-2xl text-brand-300">
                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M4 21V7l8-4 8 4v14M9 21v-4h6v4M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -123,14 +115,20 @@
                 {{ __('التزام تام بالجدول الزمني للإنشاءات والتسليم مع تشطيبات سوبر لوكس وضمان ممتد على الهيكل والأعمال الكهروميكانيكية.') }}
             </p>
         </div>
+        </div>
     </section>
+    @endif
 
+    @if(!$projectsSection || $projectsSection->is_active)
     {{-- Featured Projects Showcase --}}
     <section class="mt-16">
         <div class="mb-8 flex items-end justify-between gap-4">
             <div>
-                <p class="mobile-section-title">{{ __('Featured projects') }}</p>
-                <h2 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ __('مجتمعات سكنية متكاملة بلمسة إيطالية') }}</h2>
+                <p class="mobile-section-title">{{ $projectsSection?->subtitle ?? __('Featured projects') }}</p>
+                <h2 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ $projectsSection?->title ?? __('مجتمعات سكنية متكاملة بلمسة إيطالية') }}</h2>
+                @if($projectsSection?->content)
+                    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{{ $projectsSection->content }}</p>
+                @endif
             </div>
             <a href="{{ route('public.projects.index') }}" class="link-arrow shrink-0 text-sm font-semibold">
                 {{ __('استعرض جميع المشاريع') }} ←
@@ -192,14 +190,19 @@
             @endforelse
         </div>
     </section>
+    @endif
 
     {{-- Featured Available Units Showcase --}}
-    @if (isset($featuredUnits) && $featuredUnits->count() > 0)
+    @if ((isset($featuredUnits) && $featuredUnits->count() > 0) && ($unitsSection === null || $unitsSection->is_active))
         <section class="mt-16">
             <div class="mb-8 flex items-end justify-between gap-4">
                 <div>
-                    <p class="mobile-section-title">{{ __('فرص استثمارية مميزة') }}</p>
-                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ __('أحدث الوحدات المتاحة للتعاقد الفوري') }}</h2>
+                    <p class="mobile-section-title">{{ $unitsSection?->subtitle ?? __('فرص استثمارية مميزة') }}</p>
+                    <h2 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">{{ $unitsSection?->title ?? __('أحدث الوحدات المتاحة للتعاقد الفوري') }}</h2>
+                    @if($unitsSection?->content)
+                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{{ $unitsSection->content }}</p>
+                    @endif
+                </div>
                 </div>
                 <a href="{{ route('public.projects.index') }}" class="link-arrow shrink-0 text-sm font-semibold">
                     {{ __('تصفح جميع الوحدات') }} ←
@@ -295,18 +298,19 @@
         </section>
     @endif
 
+    @if(!$calculator || $calculator->is_active)
     {{-- Venecia Calculator Banner --}}
     <section class="mt-16 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-brand-900/40 via-slate-900 to-brand-950 p-8 text-center sm:p-12 shadow-2xl relative">
         <div class="pointer-events-none absolute inset-0 bg-grid opacity-20"></div>
         <div class="relative z-10 mx-auto max-w-2xl space-y-4">
             <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-xs font-bold text-emerald-300">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2" stroke-width="1.8"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01M16 18.5h.01" stroke-width="1.8" stroke-linecap="round"/></svg> {{ __('حاسبة الأقساط التفاعلية المباشرة') }}
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2" stroke-width="1.8"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01M16 18.5h.01" stroke-width="1.8" stroke-linecap="round"/></svg> {{ $calculator?->subtitle ?? __('حاسبة الأقساط التفاعلية المباشرة') }}
             </span>
             <h2 class="text-2xl font-bold tracking-tight text-white sm:text-4xl">
-                {{ __('احسب خطة التقسيط المناسبة لك في ثوانٍ') }}
+                {{ $calculator?->title ?? __('احسب خطة التقسيط المناسبة لك في ثوانٍ') }}
             </h2>
             <p class="text-sm leading-relaxed text-slate-300 sm:text-base">
-                {{ __('اختر مقدم التعاقد وسنوات السداد المناسبة لظروفك الاستثمارية مع معاينة حية للأقساط وإمكانية طباعة ملف PDF معتمد.') }}
+                {{ $calculator?->content ?? __('اختر مقدم التعاقد وسنوات السداد المناسبة لظروفك الاستثمارية مع معاينة حية للأقساط وإمكانية طباعة ملف PDF معتمد.') }}
             </p>
             <div class="pt-4 flex flex-col justify-center gap-3 sm:flex-row">
                 <a href="{{ route('installments.index') }}" class="app-button shadow-lg shadow-brand-600/30 px-8 py-3.5 text-sm">
@@ -318,4 +322,5 @@
             </div>
         </div>
     </section>
+    @endif
 @endsection

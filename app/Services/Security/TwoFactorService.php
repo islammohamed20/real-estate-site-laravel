@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
+use App\Models\Customer;
 use App\Models\User;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
@@ -34,7 +35,7 @@ class TwoFactorService
     /**
      * otpauth:// URI that Google Authenticator can scan.
      */
-    public function provisioningUri(User $user, string $secret): string
+    public function provisioningUri(User|Customer $user, string $secret): string
     {
         return $this->google2fa->getQRCodeUrl(
             (string) (config('app.name') ?: 'Venecia Developments'),
@@ -93,7 +94,7 @@ class TwoFactorService
     /**
      * Verify a recovery code; on success the used code is consumed (removed).
      */
-    public function verifyRecoveryCode(User $user, string $code): bool
+    public function verifyRecoveryCode(User|Customer $user, string $code): bool
     {
         $codes = is_array($user->two_factor_recovery_codes) ? $user->two_factor_recovery_codes : [];
 

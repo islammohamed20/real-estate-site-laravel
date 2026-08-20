@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Crm;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\ReservationRequest;
 use App\Models\Customer;
+use App\Services\PushNotificationService;
 use App\Models\Lead;
 use App\Models\Project;
 use App\Models\Reservation;
@@ -64,6 +65,15 @@ class ReservationController extends Controller
         $data['reserved_at'] = $data['reserved_at'] ?? now();
 
         $reservation = Reservation::query()->create($data);
+
+        // Push notification: new reservation
+        app(PushNotificationService::class)->notifyCrmEvent(
+            '🏠 حجز جديد',
+            ($reservation->customer?->name ?? $reservation->lead?->name ?? __('Customer'))
+                . ' — ' . ($reservation->unit?->unit_number ?? '')
+                . ' · ' . ($reservation->unit?->project?->name ?? ''),
+            '/real-statement-control/crm/reservations/' . $reservation->id
+        );
 
         return redirect()->route('dashboard.crm.reservations.show', $reservation)
             ->with('status', __('Reservation created successfully.'));

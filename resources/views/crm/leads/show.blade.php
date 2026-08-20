@@ -77,8 +77,8 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke-width="1.8"/></svg>
                             {{ __('Call') }}
                         </a>
-                        @if ($waLeadLink = \App\Support\WhatsApp::link($lead->whatsapp, $lead->phone))
-                            <a href="{{ $waLeadLink }}" target="_blank" class="app-button--ghost text-sm">{{ __('WhatsApp') }}</a>
+                        @if (\App\Support\WhatsApp::number($lead->whatsapp ?? $lead->phone))
+                            <a href="{{ route('dashboard.whatsapp.index', ['phone' => $lead->whatsapp ?? $lead->phone, 'name' => $lead->name]) }}" class="app-button--ghost text-sm">{{ __('WhatsApp') }}</a>
                         @endif
                         @if (! $lead->customer)
                             <form method="POST" action="{{ route('dashboard.crm.leads.convert', $lead) }}" class="inline" onsubmit="return confirm('{{ __('Convert this lead to a customer?') }}')">

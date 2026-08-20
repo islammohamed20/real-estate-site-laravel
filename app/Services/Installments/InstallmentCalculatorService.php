@@ -34,24 +34,30 @@ class InstallmentCalculatorService
                 ? (int) round($installmentYears * 12 / $frequency->monthsPerInstallment())
                 : (int) Arr::get($input, 'installment_count', 0));
 
+        // Excel model: unit price = area × (price/m² + discrimination% × price/m²),
+        // with garden/roof as local extensions.
         $basePrice = ($area * $pricePerMeter) + $gardenPrice + $roofPrice;
         $excellenceAmount = round(($basePrice * $excellencePercent) / 100, 2);
         $basePriceWithExcellence = $basePrice + $excellenceAmount;
 
-        // Discount is priced on the meter rate, but shown to the client as a
-        // discount on the total unit price (no mention of the meter basis).
-        $discountPercent = $this->discountPercentForTerm($isCash, $installmentYears);
-        $meterSubtotal = $area * $pricePerMeter;
-        $discountAmount = round($meterSubtotal * $discountPercent / 100, 2);
+        // Down payment as a percent of the unit price (Excel semantics: the
+        // entered amount is compared against the unit price, e.g. 1,776,000 on
+        // a 3,552,000 unit = 50%). Cash = 100% paid upfront.
+        if ($isCash) {
+            $downPaymentPercent = 100.0;
+        } elseif ($downPayment > 0 && $basePriceWithExcellence > 0) {
+            $downPaymentPercent = $downPayment / $basePriceWithExcellence * 100;
+        }
+
+        // Excel discount: every point of down payment above the 10% baseline
+        // earns a 30% discount point — e.g. 50% down → (50−10)×30% = 12% discount.
+        $downPaymentBonusPercent = max(0.0, $downPaymentPercent - 10) * 0.30;
+        $discountPercent = $downPaymentBonusPercent;
+        $discountAmount = round($basePriceWithExcellence * $discountPercent / 100, 2);
         $finalPrice = max(0, $basePriceWithExcellence - $discountAmount);
 
-        // Extra down-payment discount (the essential one): applies to installments
-        // whenever the down payment exceeds 10% — each point above 10% is deducted
-        // from the net total, capped at 20% (reached at a 30% down payment).
-        // The term discount below is the optional one (0% at 4+ years).
-        $downPaymentBonusPercent = $isCash ? 0.0 : max(0.0, min($downPaymentPercent - 10, 20));
-        $downPaymentDiscount = round($finalPrice * $downPaymentBonusPercent / 100, 2);
-        $finalPrice = max(0, $finalPrice - $downPaymentDiscount);
+        $discountPlanApplied = ! $isCash && $downPaymentPercent > 10;
+        $discountPlanDiscount = $discountPlanApplied ? round($discountAmount, 2) : 0.0;
 
         if ($isCash) {
             // Cash: the full discounted price is paid upfront.
@@ -59,7 +65,9 @@ class InstallmentCalculatorService
             $remaining = 0.0;
         } else {
             if ($downPayment <= 0 && $downPaymentPercent > 0) {
-                $downPayment = round(($finalPrice * $downPaymentPercent) / 100, 2);
+                // Percent-based down payment is computed on the unit price
+                // (Excel: D17 = downPaymentPercent × unit price).
+                $downPayment = round(($basePriceWithExcellence * $downPaymentPercent) / 100, 2);
             }
 
             $remaining = max(0, $finalPrice - $downPayment);
@@ -92,8 +100,10 @@ class InstallmentCalculatorService
             'base_price_with_excellence' => round($basePriceWithExcellence, 2),
             'discount_percent' => round($discountPercent, 2),
             'discount_amount' => round($discountAmount, 2),
+            'discount_plan_applied' => $discountPlanApplied,
+            'discount_plan_discount' => round($discountPlanDiscount, 2),
             'down_payment_bonus_percent' => round($downPaymentBonusPercent, 2),
-            'down_payment_discount' => round($downPaymentDiscount, 2),
+            'down_payment_discount' => round($discountAmount, 2),
             'final_price' => round($finalPrice, 2),
             'maintenance_percent' => round($maintenancePercent, 2),
             'maintenance_deposit' => $maintenanceDeposit,
@@ -104,31 +114,6 @@ class InstallmentCalculatorService
             'is_cash' => $isCash,
             'schedule' => $schedule,
         ];
-    }
-
-    /**
-     * The discount rate is priced on the meter rate and depends on the payment
-     * term: the shorter the term, the bigger the discount; cash gets the max.
-     */
-    private function discountPercentForTerm(bool $isCash, float $installmentYears): float
-    {
-        if ($isCash) {
-            return 27.55;
-        }
-
-        if ($installmentYears >= 4) {
-            return 0;
-        }
-
-        if ($installmentYears >= 3) {
-            return 7.14;
-        }
-
-        if ($installmentYears >= 2) {
-            return 12.76;
-        }
-
-        return 23.47;
     }
 
     public function calculateFromTemplate(InstallmentTemplate $template, array $input): array

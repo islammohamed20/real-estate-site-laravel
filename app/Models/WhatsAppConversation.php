@@ -21,6 +21,11 @@ class WhatsAppConversation extends Model
     public const STATUS_ASSIGNED = 'assigned';
     public const STATUS_CLOSED = 'closed';
 
+    // Platform constants
+    public const PLATFORM_WHATSAPP = 'whatsapp';
+    public const PLATFORM_FACEBOOK = 'facebook';
+    public const PLATFORM_INSTAGRAM = 'instagram';
+
     protected $fillable = [
         'customer_phone',
         'customer_name',
@@ -32,6 +37,9 @@ class WhatsAppConversation extends Model
         'unread_count',
         'last_message_at',
         'last_seen_at',
+        'platform',
+        'platform_user_id',
+        'platform_page_id',
     ];
 
     protected function casts(): array
@@ -63,13 +71,59 @@ class WhatsAppConversation extends Model
         return $this->belongsTo(Customer::class, 'linked_customer_id');
     }
 
+    public function facebookSetting(): BelongsTo
+    {
+        return $this->belongsTo(FacebookSetting::class, 'platform_page_id', 'page_id');
+    }
+
+    /**
+     * Check if this conversation is from WhatsApp.
+     */
+    public function isWhatsApp(): bool
+    {
+        return ($this->platform ?? self::PLATFORM_WHATSAPP) === self::PLATFORM_WHATSAPP;
+    }
+
+    /**
+     * Check if this conversation is from Facebook Messenger.
+     */
+    public function isFacebook(): bool
+    {
+        return $this->platform === self::PLATFORM_FACEBOOK;
+    }
+
+    /**
+     * Get platform display name.
+     */
+    public function getPlatformLabelAttribute(): string
+    {
+        return match($this->platform ?? self::PLATFORM_WHATSAPP) {
+            self::PLATFORM_WHATSAPP => 'WhatsApp',
+            self::PLATFORM_FACEBOOK => 'Facebook',
+            self::PLATFORM_INSTAGRAM => 'Instagram',
+            default => ucfirst($this->platform),
+        };
+    }
+
+    /**
+     * Get platform icon (for display in views).
+     */
+    public function getPlatformIconAttribute(): string
+    {
+        return match($this->platform ?? self::PLATFORM_WHATSAPP) {
+            self::PLATFORM_WHATSAPP => 'whatsapp',
+            self::PLATFORM_FACEBOOK => 'facebook',
+            self::PLATFORM_INSTAGRAM => 'instagram',
+            default => 'chat',
+        };
+    }
+
     public function scopeVisibleTo($query, User $user): void
     {
         if ($user->can('view all whatsapp conversations') || $user->can('assign whatsapp')) {
             return;
         }
 
-        // Sales reps see ONLY conversations assigned to them.
         $query->where('assigned_to', $user->id);
     }
 

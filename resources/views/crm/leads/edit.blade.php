@@ -32,7 +32,7 @@
             </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <label for="name" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Customer name') }} <span class="text-rose-400">*</span></label>
                 <input id="name" name="name" class="app-input" value="{{ old('name', $lead->name) }}" required>
@@ -83,7 +83,7 @@
             </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <label for="stage" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Stage') }}</label>
                 <select id="stage" name="stage" class="app-input">
@@ -144,7 +144,7 @@
             </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <label for="unit_type" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Unit type') }}</label>
                 <input id="unit_type" name="unit_type" class="app-input" list="unit-type-options" value="{{ old('unit_type', $lead->unit_type) }}" placeholder="{{ __('e.g. Apartment, Villa') }}">
@@ -180,10 +180,18 @@
                 <input id="preferred_payment_plan" name="preferred_payment_plan" class="app-input" value="{{ old('preferred_payment_plan', $lead->preferred_payment_plan) }}">
                 @error('preferred_payment_plan')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
             </div>
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-2 lg:col-span-3">
                 <label for="notes" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Notes') }}</label>
                 <textarea id="notes" name="notes" rows="4" class="app-input min-h-24">{{ old('notes', $lead->notes) }}</textarea>
                 @error('notes')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3">
+                <label for="preferred_locale" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Preferred email language') }}</label>
+                <select id="preferred_locale" name="preferred_locale" class="app-input">
+                    <option value="ar" @selected(old('preferred_locale', $lead->preferred_locale ?? 'ar'))>العربية</option>
+                    <option value="en" @selected(old('preferred_locale', $lead->preferred_locale) === 'en')>English</option>
+                </select>
+                @error('preferred_locale')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
             </div>
         </div>
 
@@ -197,8 +205,8 @@
             </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
-            <div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="lg:col-span-2">
                 <label for="interested_project_ids" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Interested projects') }}</label>
                 <select id="interested_project_ids" name="interested_project_ids[]" multiple class="app-input min-h-28">
                     @foreach ($projects as $id => $name)
@@ -218,7 +226,7 @@
             </div>
         </div>
 
-        <div class="flex flex-wrap justify-end gap-2 border-t border-white/5 pt-4">
+        <div class="sticky bottom-3 z-10 flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl">
             <a href="{{ route('dashboard.crm.leads.show', $lead) }}" class="app-button--ghost">{{ __('Cancel') }}</a>
             <button type="submit" class="app-button">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke-width="1.8"/><path d="M17 21v-8H7v8M7 3v5h8" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -242,7 +250,7 @@
             const createBox = () => {
                 box = document.createElement('div');
                 box.id = 'duplicate-warning';
-                box.style.cssText = 'margin-top:0.9rem;border:1px solid rgb(245 158 11 / 0.35);background:rgb(245 158 11 / 0.08);border-radius:1rem;padding:0.85rem 1rem;color:rgb(253 230 138 / 0.95);font-size:0.78rem;line-height:1.6;';
+                box.style.cssText = 'margin-top:0.9rem;border:1px solid #f59e0b;background:#fef3c7;border-radius:1rem;padding:0.85rem 1rem;color:#78350f;font-size:0.78rem;line-height:1.6;';
                 phoneInput.closest('form').insertBefore(box, phoneInput.closest('form').firstChild);
             };
 
@@ -262,7 +270,7 @@
                 if (leadCount > 0) {
                     html += '<p style="margin-bottom:0.3rem;opacity:0.9;">{{ __('Existing leads') }}:</p><ul style="list-style:none;margin:0 0 0.5rem;padding:0;display:flex;flex-direction:column;gap:0.3rem;">';
                     data.leads.forEach(l => {
-                        html += '<li><a href="' + l.url + '" target="_blank" style="color:#7dd3fc;text-decoration:underline;">👤 ' + l.name + ' — ' + l.phone + (l.stage ? ' (' + l.stage + ')' : '') + '</a></li>';
+                        html += '<li><a href="' + l.url + '" target="_blank" style="color:#0369a1;text-decoration:underline;">👤 ' + l.name + ' — ' + l.phone + (l.stage ? ' (' + l.stage + ')' : '') + '</a></li>';
                     });
                     html += '</ul>';
                 }
@@ -270,7 +278,7 @@
                 if (customerCount > 0) {
                     html += '<p style="margin-bottom:0.3rem;opacity:0.9;">{{ __('Existing customers') }}:</p><ul style="list-style:none;margin:0 0 0.5rem;padding:0;display:flex;flex-direction:column;gap:0.3rem;">';
                     data.customers.forEach(c => {
-                        html += '<li><a href="' + c.url + '" target="_blank" style="color:#6ee7b7;text-decoration:underline;">🏢 ' + c.name + ' — ' + c.phone + '</a></li>';
+                        html += '<li><a href="' + c.url + '" target="_blank" style="color:#047857;text-decoration:underline;">🏢 ' + c.name + ' — ' + c.phone + '</a></li>';
                     });
                     html += '</ul>';
                 }

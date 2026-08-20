@@ -17,6 +17,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('dashboard.crm.index') }}" class="app-button--ghost">{{ __('CRM Home') }}</a>
+                <a href="{{ route('dashboard.crm.data-transfer.index', ['type' => 'customers']) }}" class="app-button--ghost">{{ __('Import / Export') }}</a>
                 <a href="{{ route('dashboard.crm.customers.create') }}" class="app-button">{{ __('+ New Customer') }}</a>
             </div>
         </div>

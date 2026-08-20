@@ -20,7 +20,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <title>{{ $title ?? config('app.name') }}</title>
+    @php
+        $company = optional($companyProfile);
+        $seoTitle = ($title ?? '') ?: ($company->seo_title ?: $company->name ?: config('app.name'));
+        $seoDescription = $company->seo_description ?: __('رواد في صناعة التطوير العقاري والمجتمعات السكنية الفاخرة. نقدم حلولا معمارية متكاملة وتصاميم أيقونية بأرقى المواقع وأسهل أنظمة السداد.');
+        $seoImage = $company->seo_image_path ?: $company->logo_light_path ?: $company->favicon_path;
+        $currentUrl = url()->current();
+    @endphp
+    <title>{{ $seoTitle }}</title>
+    <meta name="description" content="{{ $seoDescription }}">
+    <link rel="canonical" href="{{ $currentUrl }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ $companyProfile?->name ?: config('app.name') }}">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDescription }}">
+    <meta property="og:url" content="{{ $currentUrl }}">
+    @if ($seoImage)
+        <meta property="og:image" content="{{ $seoImage }}">
+        <meta property="og:image:alt" content="{{ $seoTitle }}">
+    @endif
+    <meta name="twitter:card" content="{{ $seoImage ? 'summary_large_image' : 'summary' }}">
+    <meta name="twitter:title" content="{{ $seoTitle }}">
+    <meta name="twitter:description" content="{{ $seoDescription }}">
+    @if ($seoImage)
+        <meta name="twitter:image" content="{{ $seoImage }}">
+    @endif
     <script>
         (function () {
             try {

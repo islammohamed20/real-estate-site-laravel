@@ -41,7 +41,19 @@
                         </span>
                     </template>
 
-                    @if($canManage)
+                    @if($evolutionDashboardUrl && auth()->user()->hasAnyRole(['Administrator', 'Owner']))
+                        <a href="{{ $evolutionDashboardUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-200 transition hover:bg-sky-500/20 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="{{ __('Open Evolution Dashboard') }}">
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7" stroke-linecap="round"/><path d="M10 14L21 3" stroke-linecap="round"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" stroke-linecap="round"/></svg>
+                            <span class="hidden sm:inline">{{ __('Dashboard') }}</span>
+                        </a>
+                    @endif
+
+                    <button @click="toggleSound()" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10" :title="soundOn ? '{{ __('Notification sound on') }}' : '{{ __('Notification sound off') }}'">
+                        <svg x-show="soundOn" x-cloak class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" stroke-linecap="round"/></svg>
+                        <svg x-show="!soundOn" x-cloak class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 9a5.15 5.15 0 0 1 0 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.4 5.6a10.3 10.3 0 0 1 0 12.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3l18 18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+
+                    @if(auth()->user()->hasAnyRole(['Administrator', 'Owner']))
                         <button @click="registerWebhook()" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold" title="{{ __('Register Webhook') }}">
                             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke-linecap="round"/></svg>
                             <span class="hidden sm:inline">{{ __('Register Webhook') }}</span>
@@ -80,6 +92,14 @@
                             <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
                             <input x-model="search" type="text" placeholder="{{ __('Search name or phone...') }}" class="w-full rounded-xl border border-white/10 bg-slate-950/40 py-2 pe-3 ps-9 text-sm text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none">
                         </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-500 shrink-0">{{ __('Platform') }}:</span>
+                            <select x-model="platformFilter" class="flex-1 rounded-xl border border-white/10 bg-slate-950/40 py-1.5 px-2 text-xs text-white focus:border-brand-500 focus:outline-none">
+                                <option value="all">{{ __('All') }}</option>
+                                <option value="whatsapp">🟢 WhatsApp</option>
+                                <option value="facebook">🔵 Facebook</option>
+                            </select>
+                        </div>
                         <div class="flex gap-1.5">
                             <button @click="filter = 'all'; loadConversations()" type="button" class="flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition" :class="filter === 'all' ? 'bg-brand-600 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'">{{ __('All') }}</button>
                             <button @click="filter = 'new'; loadConversations()" type="button" class="flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition" :class="filter === 'new' ? 'bg-amber-500 text-slate-950' : 'bg-white/5 text-slate-400 hover:bg-white/10'">{{ __('New') }}</button>
@@ -100,7 +120,9 @@
                                 <span class="min-w-0 flex-1">
                                     <span class="flex items-baseline justify-between gap-2">
                                         <span class="truncate text-sm font-semibold" :class="c.unread_count > 0 ? 'text-white' : 'text-slate-300'" x-text="c.customer_name || c.customer_phone"></span>
-                                        <span class="shrink-0 text-[10px]" :class="c.unread_count > 0 ? 'font-bold text-emerald-400' : 'text-slate-500'" x-text="c.last_message_raw ? timeAgo(c.last_message_raw) : ''"></span>
+                                        <span x-show="c.platform === 'facebook'" class="inline-flex items-center gap-0.5 rounded-md bg-[#1877f2]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#4da6ff]">FB</span>
+                                        <span x-show="c.platform === 'instagram'" class="inline-flex items-center gap-0.5 rounded-md bg-pink-500/15 px-1.5 py-0.5 text-[9px] font-bold text-pink-400">IG</span>
+                                        <span class="shrink-0 text-[10px] tabular-nums" :class="c.unread_count > 0 ? 'font-bold text-emerald-400' : 'text-slate-500'" :title="c.last_message_raw ? fullTime(c.last_message_raw) : ''" x-text="c.last_message_raw ? lastTimeLabel(c.last_message_raw) : ''"></span>
                                     </span>
                                     <span class="flex items-center justify-between gap-2">
                                         <span class="truncate text-xs" :class="c.unread_count > 0 ? 'font-medium text-emerald-200' : 'text-slate-500'" x-text="c.customer_phone"></span>
@@ -136,18 +158,34 @@
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-sm font-bold text-emerald-300" x-text="(current.customer_name || current.customer_phone).charAt(0).toUpperCase()"></span>
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-sm font-bold text-white" x-text="current.customer_name || current.customer_phone"></p>
-                                    <p class="truncate text-[11px] text-slate-500" x-text="current.customer_phone + (current.assigned_name ? ' · ' + current.assigned_name : '')"></p>
+                                    <p class="truncate text-[11px] text-slate-500"><span x-show="current.platform === 'facebook'" class="inline-flex items-center gap-1 rounded-md bg-[#1877f2]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#4da6ff]">Facebook Messenger</span> <span x-show="current.platform === 'instagram'" class="inline-flex items-center gap-1 rounded-md bg-pink-500/15 px-1.5 py-0.5 text-[9px] font-bold text-pink-400">Instagram DM</span> <span x-show="!current.platform || current.platform === 'whatsapp'" x-text="current.customer_phone"></span><span x-text="(current.budget ? ' · ' + '{{ __('Budget') }}' + ': EGP ' + Number(current.budget).toLocaleString() : '') + (current.assigned_name ? ' · ' + current.assigned_name : '')"></span></p>
                                 </div>
 
                                 {{-- CRM links --}}
                                 <div class="hidden items-center gap-1.5 md:flex">
-                                    <template x-if="existingLeads[current.customer_phone] && existingLeads[current.customer_phone].length && !current.linked_lead_id">
-                                        <button @click="linkExistingLead(current, existingLeads[current.customer_phone][0].id)" type="button" class="inline-flex items-center gap-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/20">
-                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke-linecap="round"/><path d="M15 3h6v6M10 14 21 3" stroke-linecap="round"/></svg>
-                                            {{ __('Link lead') }} ({{ __('exists') }})
+                                    {{-- Existing lead (by phone): status badge + direct edit --}}
+                                    <template x-if="existingLead">
+                                        <button @click="linkExistingLead(current, existingLead, existingCustomer)" type="button"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                                            :title="current.linked_lead_id ? '{{ __('Open linked lead') }}' : '{{ __('Link lead') }}'">
+                                            <span class="h-1.5 w-1.5 rounded-full" :class="stageColor(existingLead.stage)"></span>
+                                            <span x-text="existingLead.stage_label || '{{ __('Lead') }}'"></span>
                                         </button>
+                                        <a :href="'/real-statement-control/crm/leads/' + existingLead.id + '/edit'" class="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-200 hover:bg-white/10" :title="'{{ __('Edit lead') }}: ' + existingLead.name">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9" stroke-linecap="round"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            {{ __('Edit lead') }}
+                                        </a>
                                     </template>
-                                    <template x-if="current.linked_lead_id">
+
+                                    {{-- Existing customer only (no lead): direct edit --}}
+                                    <template x-if="!existingLead && existingCustomer">
+                                        <a :href="'/real-statement-control/crm/customers/' + existingCustomer.id + '/edit'" class="inline-flex items-center gap-1 rounded-lg bg-brand-500/15 px-2 py-1 text-[10px] font-bold text-brand-300 hover:bg-brand-500/25">
+                                            {{ __('Customer') }} · <span x-text="existingCustomer.name || ''"></span>
+                                        </a>
+                                    </template>
+
+                                    {{-- Linked to a different lead than the phone's own --}}
+                                    <template x-if="current.linked_lead_id && !existingLead">
                                         <a :href="'/real-statement-control/crm/leads/' + current.linked_lead_id + '/edit'" class="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25">
                                             {{ __('Linked lead') }} · <span x-text="current.linked_lead_name || ''"></span>
                                         </a>
@@ -157,10 +195,20 @@
                                             {{ __('Linked customer') }}
                                         </a>
                                     </template>
-                                    <button @click="openLeadModal = true" type="button" class="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-200 hover:bg-white/10">
-                                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6" stroke-linecap="round"/></svg>
-                                        {{ __('Create lead') }}
-                                    </button>
+
+                                    {{-- Existing lead: open profile; new number: create lead --}}
+                                    <template x-if="existingLead">
+                                        <a :href="'{{ url('/real-statement-control/crm/leads') }}/' + existingLead.id" class="inline-flex items-center gap-1 rounded-lg border border-brand-500/20 bg-brand-500/10 px-2 py-1 text-[10px] font-bold text-brand-300 hover:bg-brand-500/20">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M18 13v5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            {{ __('Open lead profile') }}
+                                        </a>
+                                    </template>
+                                    <template x-if="!existingLead && canCreateLeads">
+                                        <button @click="showLeadModal()" type="button" class="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-200 hover:bg-white/10">
+                                            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6" stroke-linecap="round"/></svg>
+                                            {{ __('Create lead') }}
+                                        </button>
+                                    </template>
                                 </div>
 
                                 {{-- Claim (unassigned, managers only) --}}
@@ -185,17 +233,25 @@
                                     class="rounded-xl px-3 py-1.5 text-xs font-bold transition"
                                     :class="current.status === 'closed' ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-white/5 text-slate-300 hover:bg-white/10'"
                                     x-text="current.status === 'closed' ? '{{ __('Reopen') }}' : '{{ __('Close') }}'"></button>
+
+                                <button @click="openRenameModal()" type="button" class="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-sky-300" title="{{ __('Rename customer') }}">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9" stroke-linecap="round"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
+                                <template x-if="canManage">
+                                    <button @click="deleteConversation()" type="button" class="rounded-xl p-2 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400" title="{{ __('Delete conversation') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-linecap="round"/></svg>
+                                    </button>
+                                </template>
                             </div>
 
                             {{-- Messages --}}
-                            <div class="chat-bg relative flex-1 overflow-y-auto px-3 py-4 sm:px-5" x-ref="messagesBox" @scroll="onMessagesScroll">
+                            <div class="chat-bg relative flex-1 overflow-y-auto px-3 py-4 sm:px-5" x-ref="messagesBox" @scroll="onMessagesScroll" :style="'background-color:' + chatBackground">
                                 <div class="space-y-2">
                                     <template x-for="m in messages" :key="m.id">
                                         <div class="flex" :class="m.direction === 'outgoing' ? 'justify-start' : 'justify-end'">
                                             <div class="relative max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow sm:max-w-[70%]"
-                                                :class="m.direction === 'outgoing'
-                                                    ? 'rounded-ss-md bg-[#005c4b] text-white'
-                                                    : 'rounded-se-md bg-slate-800 text-slate-100'">
+                                                :class="m.direction === 'outgoing' ? 'rounded-ss-md' : 'rounded-se-md'"
+                                                :style="bubbleStyle(m)">
                                                 <template x-if="m.message_type === 'document'">
                                                     <div class="mb-1.5 flex items-center gap-3 rounded-xl bg-white/10 p-2.5">
                                                         <a :href="'/real-statement-control/whatsapp/media/' + m.id" target="_blank" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-500/20 text-rose-300 transition hover:bg-rose-500/30" title="{{ __('Download') }}">
@@ -208,6 +264,13 @@
                                                     </div>
                                                 </template>
                                                 <p class="whitespace-pre-wrap break-words" x-text="m.body"></p>
+                                                <template x-if="m.reactions && m.reactions.length">
+                                                    <div class="mt-1 flex flex-wrap items-center gap-1">
+                                                        <template x-for="reaction in m.reactions" :key="reaction.direction + reaction.created_at">
+                                                            <span class="rounded-full border border-white/15 bg-black/20 px-1.5 py-0.5 text-sm leading-none" :title="reaction.direction === 'outgoing' ? '{{ __('Reaction from the team') }}' : '{{ __('Reaction from customer') }}'" x-text="reaction.emoji"></span>
+                                                        </template>
+                                                    </div>
+                                                </template>
                                                 <div class="mt-1 flex items-center justify-end gap-1.5 text-[10px]"
                                                     :class="m.direction === 'outgoing' ? 'text-emerald-100/70' : 'text-slate-400'">
                                                     <span x-text="m.created_at"></span>
@@ -235,7 +298,7 @@
                             <div class="border-t border-white/10 bg-slate-950/30 p-2.5 sm:p-3">
                                 <div class="flex items-end gap-2">
                                     <div class="relative flex-1">
-                                        <textarea x-model="draft" @keydown.enter.exact.prevent="sendMessage()" rows="1" x-ref="composer" @input="autoGrow($el)"
+                                        <textarea x-model="draft" @keydown="handleComposerKeydown($event)" rows="1" x-ref="composer" @input="autoGrow($el)"
                                             class="max-h-36 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                                             placeholder="{{ __('Type a message...') }}"></textarea>
                                         <div class="absolute bottom-2 end-2 flex items-center gap-1">
@@ -326,6 +389,10 @@
                 <h3 class="text-lg font-bold text-white">{{ __('Create lead from conversation') }}</h3>
                 <p class="mt-1 text-xs text-slate-400">{{ __('The lead will be linked to this conversation and appears in the CRM.') }}</p>
                 <div class="mt-5 space-y-4">
+                    <div class="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2.5 text-sm">
+                        <span class="text-slate-400">{{ __('Phone number') }}:</span>
+                        <span class="font-semibold text-white" x-text="current?.customer_phone || ''"></span>
+                    </div>
                     <label class="block">
                         <span class="mb-1.5 block text-xs font-semibold text-slate-300">{{ __('Name') }}</span>
                         <input x-model="leadName" type="text" class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none">
@@ -338,6 +405,24 @@
                 <div class="mt-6 flex justify-end gap-2">
                     <button @click="openLeadModal = false" class="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5">{{ __('Cancel') }}</button>
                     <button @click="createLead()" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-400">{{ __('Create & link') }}</button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Rename customer modal --}}
+        <div x-show="renameModal" x-cloak x-transition.opacity class="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" @click.self="renameModal = false">
+            <div class="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl" x-show="renameModal" x-transition.scale.origin.center>
+                <h3 class="text-lg font-bold text-white">{{ __('Rename customer') }}</h3>
+                <p class="mt-1 text-xs text-slate-400">{{ __('Change the display name of this conversation.') }}</p>
+                <div class="mt-5">
+                    <label class="block">
+                        <span class="mb-1.5 block text-xs font-semibold text-slate-300">{{ __('Customer name') }}</span>
+                        <input x-model="renameName" type="text" maxlength="255" class="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none" @keydown.enter.prevent="saveRename()">
+                    </label>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <button @click="renameModal = false" class="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5">{{ __('Cancel') }}</button>
+                    <button @click="saveRename()" :disabled="!renameName.trim()" class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-400 disabled:opacity-40">{{ __('Save') }}</button>
                 </div>
             </div>
         </div>
@@ -369,15 +454,24 @@
                 canReply: @json($canReply),
                 evolutionConfigured: @json($evolutionConfigured),
                 connectionOpen: @json($connectionOpen),
+                outgoingColor: @json($outgoingColor),
+                incomingColor: @json($incomingColor),
+                chatBackground: @json($chatBackground),
+                openPhone: @json($openPhone),
+                openName: @json($openName),
+                canCreateLeads: @json($canCreateLeads),
 
                 selected: null,
                 messages: [],
                 filter: 'all',
+                platformFilter: 'all',
                 search: '',
                 draft: '',
                 sending: false,
                 openStartModal: false,
                 openLeadModal: false,
+                renameModal: false,
+                renameName: '',
                 startPhone: '',
                 startName: '',
                 leadName: '',
@@ -389,6 +483,7 @@
                 originalTitle: document.title,
                 flashTimer: null,
                 audioCtx: null,
+                soundOn: localStorage.getItem('waSound') !== '0',
 
                 get current() {
                     return this.conversations.find(c => c.id === this.selected) || null;
@@ -397,14 +492,43 @@
                 get filteredConversations() {
                     const q = this.search.trim().toLowerCase();
                     return this.conversations.filter(c =>
-                        (!q || (c.customer_name || '').toLowerCase().includes(q) || (c.customer_phone || '').includes(q))
+                        (!q || (c.customer_name || '').toLowerCase().includes(q) || (c.customer_phone || '').includes(q)) && (this.platformFilter === 'all' || c.platform === this.platformFilter)
                     );
+                },
+
+                get existingLead() {
+                    return (this.existingLeads[this.current?.customer_phone || ''] || [])[0] || null;
+                },
+
+                get existingCustomer() {
+                    return (this.existingCustomers[this.current?.customer_phone || ''] || [])[0] || null;
                 },
 
                 init() {
                     this.sortConversations();
                     this.snapshotState(this.conversations);
                     this.pollTimer = setInterval(() => this.loadConversations(true), 5000);
+                    if (this.openPhone) {
+                        this.openPhoneConversation();
+                    }
+                    // Browsers block autoplay audio until the user interacts —
+                    // unlock the AudioContext on the first click anywhere.
+                    document.addEventListener('click', () => this.unlockAudio(), { once: true });
+                },
+
+                unlockAudio() {
+                    try {
+                        const AC = window.AudioContext || window.webkitAudioContext;
+                        if (!AC) return;
+                        if (!this.audioCtx) this.audioCtx = new AC();
+                        if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+                    } catch (e) { /* audio not supported — skip */ }
+                },
+
+                toggleSound() {
+                    this.soundOn = !this.soundOn;
+                    localStorage.setItem('waSound', this.soundOn ? '1' : '0');
+                    if (this.soundOn) this.unlockAudio();
                 },
 
                 snapshotState(list) {
@@ -434,6 +558,7 @@
                 },
 
                 playAlertSound() {
+                    if (!this.soundOn) return;
                     try {
                         const AC = window.AudioContext || window.webkitAudioContext;
                         if (!AC) return;
@@ -700,6 +825,12 @@
                     } catch (e) { /* silent */ }
                 },
 
+                showLeadModal() {
+                    this.leadName = this.current?.customer_name || '';
+                    this.leadBudget = '';
+                    this.openLeadModal = true;
+                },
+
                 async createLead() {
                     if (!this.current) return;
                     const conv = this.current;
@@ -729,6 +860,75 @@
                     }
                 },
 
+                // Opened from a customer/lead "WhatsApp" button: open the
+                // existing conversation for that number, or if it was never
+                // chatted before, create it. A CRM lead stored for this number
+                // is linked automatically (name + budget come from CRM); a
+                // brand-new customer gets the "create lead from conversation"
+                // screen with the phone pre-filled from the conversation.
+                async openPhoneConversation() {
+                    const phone = this.openPhone;
+                    try {
+                        const res = await fetch('/real-statement-control/whatsapp/conversations?search=' + encodeURIComponent(phone), {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await res.json();
+                        const normalized = phone.replace(/^0/, '20');
+                        const existing = data.conversations.find(c =>
+                            (c.customer_phone || '').includes(phone) || (c.customer_phone || '').includes(normalized)
+                        );
+                        const lead = (this.existingLeads[normalized] || [])[0];
+                        const customer = (this.existingCustomers[normalized] || [])[0];
+                        if (existing) {
+                            this.openConversation(existing.id);
+                            if (lead && !existing.linked_lead_id) this.linkExistingLead(existing, lead, customer);
+                            return;
+                        }
+                        // No previous chat — create the conversation.
+                        this.startPhone = phone;
+                        this.startName = this.openName || '';
+                        await this.startConversation();
+                        // Lead already stored in CRM → auto-link name + budget,
+                        // no re-entry screen.
+                        if (lead) {
+                            this.linkExistingLead(this.current, lead, customer);
+                            return;
+                        }
+                        // Brand-new customer from WhatsApp → show the lead
+                        // creation screen (phone + name pre-filled).
+                        if (this.canCreateLeads) this.showLeadModal();
+                    } catch (e) {
+                        this.startPhone = phone;
+                        this.startName = this.openName || '';
+                        this.startConversation();
+                    }
+                },
+
+                async linkExistingLead(conv, lead, customer) {
+                    if (!conv) return;
+                    try {
+                        const res = await fetch('/real-statement-control/whatsapp/conversations/' + conv.id + '/link', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                linked_lead_id: lead.id,
+                                linked_customer_id: customer ? customer.id : null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const idx = this.conversations.findIndex(c => c.id === conv.id);
+                            if (idx !== -1) this.conversations[idx] = data.conversation;
+                            window.toast.success('{{ __('Linked to existing lead.') }}');
+                        }
+                    } catch (e) { /* keep the conversation as-is */ }
+                },
+
                 async startConversation() {
                     if (!this.startPhone.trim()) return;
                     try {
@@ -755,6 +955,65 @@
                         }
                     } catch (e) {
                         window.toast.danger('{{ __('Failed to start conversation.') }}');
+                    }
+                },
+
+                openRenameModal() {
+                    this.renameName = (this.current?.customer_name || this.current?.customer_phone || '');
+                    this.renameModal = true;
+                },
+
+                async saveRename() {
+                    if (!this.current || !this.renameName.trim()) return;
+                    try {
+                        const res = await fetch('/real-statement-control/whatsapp/conversations/' + this.current.id + '/rename', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ name: this.renameName.trim() })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.renameModal = false;
+                            const conv = this.conversations.find(c => c.id === this.current.id);
+                            if (conv) conv.customer_name = data.conversation.customer_name;
+                            window.toast.success('{{ __('Customer renamed.') }}');
+                        } else {
+                            window.toast.danger(data.message || '{{ __('Failed to rename customer.') }}');
+                        }
+                    } catch (e) {
+                        window.toast.danger('{{ __('Failed to rename customer.') }}');
+                    }
+                },
+
+                async deleteConversation() {
+                    if (!this.current) return;
+                    if (!confirm('{{ __('Delete this conversation? It moves to the trash and can be restored.') }}')) return;
+                    const id = this.current.id;
+                    try {
+                        const res = await fetch('/real-statement-control/whatsapp/conversations/' + id, {
+                            method: 'DELETE',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.conversations = this.conversations.filter(c => c.id !== id);
+                            this.selected = null;
+                            this.messages = [];
+                            window.toast.success('{{ __('Conversation moved to trash.') }}');
+                        } else {
+                            window.toast.danger(data.message || '{{ __('Failed to delete conversation.') }}');
+                        }
+                    } catch (e) {
+                        window.toast.danger('{{ __('Failed to delete conversation.') }}');
                     }
                 },
 
@@ -787,6 +1046,16 @@
                     // Keep polling while scrolled (no special handling for v1).
                 },
 
+                handleComposerKeydown(event) {
+                    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.sendMessage();
+                },
+
                 autoGrow(el) {
                     el.style.height = 'auto';
                     el.style.height = Math.min(el.scrollHeight, 144) + 'px';
@@ -802,8 +1071,57 @@
                     return Math.floor(s / 86400) + '{{ __('d') }}';
                 },
 
+                fullTime(raw) {
+                    if (!raw) return '';
+                    const d = new Date(raw.replace(' ', 'T'));
+                    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+                        + ' ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0')
+                        + '/' + d.getFullYear();
+                },
+
+                lastTimeLabel(raw) {
+                    if (!raw) return '';
+                    const d = new Date(raw.replace(' ', 'T'));
+                    const now = new Date();
+                    // Today: show the exact time (HH:MM) of the last message.
+                    if (d.toDateString() === now.toDateString()) {
+                        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                    }
+                    // Within this week: show the weekday.
+                    if (d.getTime() > now.getTime() - 7 * 86400000) {
+                        return d.toLocaleDateString('en-US', { weekday: 'short' });
+                    }
+                    // Older: show the date.
+                    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+                },
+
                 statusLabel(status) {
                     return status === 'closed' ? '{{ __('Closed') }}' : (status === 'assigned' ? '{{ __('Assigned') }}' : '{{ __('New') }}');
+                },
+
+                stageColor(stage) {
+                    const map = {
+                        new: 'bg-amber-400',
+                        contacted: 'bg-sky-400',
+                        interested: 'bg-emerald-400',
+                        meeting: 'bg-violet-400',
+                        site_visit: 'bg-indigo-400',
+                        negotiation: 'bg-orange-400',
+                        reserved: 'bg-rose-400',
+                        contract: 'bg-fuchsia-400',
+                        delivered: 'bg-teal-400',
+                    };
+                    return map[stage] || 'bg-slate-400';
+                },
+
+                bubbleStyle(m) {
+                    const bg = m.direction === 'outgoing' ? this.outgoingColor : this.incomingColor;
+                    const hex = (bg || '#ffffff').replace('#', '');
+                    const r = parseInt(hex.substring(0, 2), 16) || 0;
+                    const g = parseInt(hex.substring(2, 4), 16) || 0;
+                    const b = parseInt(hex.substring(4, 6), 16) || 0;
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    return 'background-color:' + (bg || '#ffffff') + ';color:' + (luminance > 0.6 ? '#0f172a' : '#ffffff');
                 }
             };
         }

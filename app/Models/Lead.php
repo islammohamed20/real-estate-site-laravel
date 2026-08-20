@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\LeadStage;
 use App\Models\Crm\CrmActivity;
+use App\Services\Sales\LeadAssignmentService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -41,6 +42,7 @@ class Lead extends Model
         'preferred_payment_plan',
         'priority',
         'notes',
+        'preferred_locale',
         'last_contacted_at',
         'follow_up_at',
         'converted_at',
@@ -57,6 +59,18 @@ class Lead extends Model
             'follow_up_at' => 'datetime',
             'converted_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Automatic distribution: a new lead without an assigned salesperson
+        // is routed to the least-loaded active sales member (togglable from
+        // Settings → Sales Automation).
+        static::creating(function (Lead $lead): void {
+            if ($lead->assigned_sales_id === null && \App\Models\AutomationSetting::enabled('lead_auto_assign')) {
+                $lead->assigned_sales_id = app(LeadAssignmentService::class)->pickLeastLoadedId();
+            }
+        });
     }
 
     public function customer(): BelongsTo

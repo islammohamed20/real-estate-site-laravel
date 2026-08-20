@@ -50,8 +50,8 @@
                 </label>
 
                 <label class="stagger-item block space-y-2" style="animation-delay:420ms">
-                    <span class="text-sm font-medium text-slate-300">{{ __('Email') }} <span class="text-xs text-slate-500">{{ __('(optional)') }}</span></span>
-                    <input type="email" name="email" value="{{ old('email') }}" inputmode="email" autocomplete="email" class="app-input transition-all duration-300 focus:scale-[1.01]" placeholder="{{ __('you@example.com') }}">
+                    <span class="text-sm font-medium text-slate-300">{{ __('Email') }}</span>
+                    <input type="email" name="email" value="{{ old('email') }}" required inputmode="email" autocomplete="email" class="app-input transition-all duration-300 focus:scale-[1.01]" placeholder="{{ __('you@example.com') }}">
                     @error('email')
                         <span class="block text-sm text-rose-400">{{ $message }}</span>
                     @enderror
@@ -59,6 +59,7 @@
 
                 <p class="stagger-item rounded-2xl border border-brand-500/20 bg-brand-500/10 px-4 py-3 text-xs leading-relaxed text-brand-200" style="animation-delay:480ms">
                     {{ __('If your phone number is already in our customer records, registering will link this account to it.') }}
+                    {{ __('We will send a 6-digit verification code to your email to activate the account.') }}
                 </p>
 
                 <label class="stagger-item block space-y-2" style="animation-delay:540ms">
@@ -67,6 +68,18 @@
                     @error('password')
                         <span class="block text-sm text-rose-400">{{ $message }}</span>
                     @enderror
+
+                    <div class="password-strength hidden pt-0.5" data-password-strength>
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex flex-1 gap-1.5" role="meter" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" aria-label="{{ __('Password strength') }}" data-strength-segments>
+                                <span class="h-1.5 flex-1 rounded-full bg-white/10 transition-all duration-300"></span>
+                                <span class="h-1.5 flex-1 rounded-full bg-white/10 transition-all duration-300"></span>
+                                <span class="h-1.5 flex-1 rounded-full bg-white/10 transition-all duration-300"></span>
+                                <span class="h-1.5 flex-1 rounded-full bg-white/10 transition-all duration-300"></span>
+                            </div>
+                            <span class="min-w-16 text-end text-xs font-semibold text-slate-500" data-strength-label>{{ __('Weak') }}</span>
+                        </div>
+                    </div>
                 </label>
 
                 <label class="stagger-item block space-y-2" style="animation-delay:600ms">
@@ -88,3 +101,73 @@
         </p>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const field = document.querySelector('input[name="password"]');
+        if (!field) return;
+
+        const meter = field.closest('label')?.querySelector('[data-password-strength]');
+        if (!meter) return;
+
+        const segments = meter.querySelectorAll('[data-strength-segments] > span');
+        const label = meter.querySelector('[data-strength-label]');
+        const bar = meter.querySelector('[role="meter"]');
+
+        const LABELS = {!! json_encode([__('Weak'), __('Fair'), __('Good'), __('Strong')]) !!};
+        const FILL = ['bg-rose-500', 'bg-rose-500', 'bg-amber-500', 'bg-brand-500', 'bg-emerald-500'];
+        const TEXT = ['text-rose-400', 'text-rose-400', 'text-amber-400', 'text-brand-300', 'text-emerald-400'];
+
+        const COMMON = new Set([
+            'password', 'password1', 'password123', '12345678', '123456789',
+            '1234567890', 'qwerty123', 'qwertyuiop', 'abc12345', 'admin123',
+            'letmein', 'iloveyou', '11111111', '00000000', '12345678a',
+        ]);
+
+        function levelOf(value) {
+            const v = value.toLowerCase();
+
+            if (COMMON.has(v)) return 1;
+
+            let score = 0;
+            if (value.length >= 8) score += 1;
+            if (value.length >= 12) score += 1;
+            if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+            if (/\d/.test(value)) score += 1;
+            if (/[^A-Za-z0-9]/.test(value)) score += 1;
+
+            if (new Set(v).size <= 3) score = Math.min(score, 1);
+
+            if (score >= 5) return 4;
+            if (score >= 3) return 3;
+            if (score === 2) return 2;
+            return 1;
+        }
+
+        function render() {
+            if (!field.value) {
+                meter.classList.add('hidden');
+                return;
+            }
+
+            meter.classList.remove('hidden');
+            const level = levelOf(field.value);
+
+            segments.forEach((segment, i) => {
+                FILL.forEach((color) => segment.classList.remove(color));
+                segment.classList.toggle('bg-white/10', i >= level);
+                if (i < level) segment.classList.add(FILL[level]);
+            });
+
+            label.textContent = LABELS[level - 1];
+            label.className = 'min-w-16 text-end text-xs font-semibold ' + TEXT[level];
+            bar.setAttribute('aria-valuenow', String(level));
+        }
+
+        field.addEventListener('input', render);
+
+        if (field.value) render();
+    })();
+</script>
+@endpush

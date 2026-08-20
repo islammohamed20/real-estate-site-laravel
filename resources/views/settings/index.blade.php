@@ -16,6 +16,8 @@
             'financial' => ['label' => __('Financial'), 'icon' => 'currency'],
             'email' => ['label' => __('Email / SMTP'), 'icon' => 'mail'],
             'whatsapp' => ['label' => __('WhatsApp'), 'icon' => 'message'],
+            'seo' => ['label' => __('SEO / Social Preview'), 'icon' => 'globe'],
+            'notifications' => ['label' => __('Notifications'), 'icon' => 'bell'],
             'security' => ['label' => __('Security'), 'icon' => 'shield'],
             'trash' => ['label' => __('Trash & Cleanup'), 'icon' => 'trash'],
         ];
@@ -65,6 +67,12 @@
                                 @break
                             @case('mail')
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="16" rx="2" stroke-width="1.8"/><path d="M22 7-8.97 12.98a1.94 1.94 0 0 1-2.06 0L2 7" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                @break
+                            @case('globe')
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" stroke-width="1.8"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                @break
+                            @case('bell')
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 @break
                             @case('shield')
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -304,6 +312,22 @@
                         <input class="app-input" name="email" value="{{ old('email', $profile->email) }}" placeholder="info@example.com" type="email" inputmode="email">
                     </label>
 
+                    <label class="space-y-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 3.667H9.101V23.691h.001z"/></svg>
+                            {{ __('Facebook URL') }}
+                        </span>
+                        <input class="app-input" name="facebook_url" value="{{ old('facebook_url', $profile->facebook_url) }}" placeholder="https://facebook.com/venecia" type="url" inputmode="url" dir="ltr">
+                    </label>
+
+                    <label class="space-y-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+                            {{ __('Instagram URL') }}
+                        </span>
+                        <input class="app-input" name="instagram_url" value="{{ old('instagram_url', $profile->instagram_url) }}" placeholder="https://instagram.com/venecia" type="url" inputmode="url" dir="ltr">
+                    </label>
+
                     <label class="space-y-2 sm:col-span-2">
                         <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
                             <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke-width="1.8"/><circle cx="12" cy="10" r="3" stroke-width="1.8"/></svg>
@@ -345,7 +369,7 @@
                             {{ __('Maintenance Percentage') }}
                         </span>
                         <div class="relative">
-                            <input class="app-input pr-8" name="maintenance_percent" value="{{ old('maintenance_percent', $profile->maintenance_percent) }}" placeholder="0.00" type="number" step="0.01" min="0" max="100">
+                            <input class="app-input pr-8" name="maintenance_percent" value="{{ old('maintenance_percent', $profile->maintenance_percent ?? 0.00) }}" placeholder="0.00" type="number" step="0.01" min="0" max="100" required>
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">%</span>
                         </div>
                         <p class="text-xs text-slate-500">{{ __('Applied as a percentage on unit prices') }}</p>
@@ -415,7 +439,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <label class="space-y-2">
                             <span class="text-sm font-medium text-slate-300">{{ __('API URL') }}</span>
-                            <input class="app-input" name="evolution_api_url" value="{{ old('evolution_api_url', $profile->evolution_api_url) }}" placeholder="https://evolution.example.com" type="url">
+                            <input class="app-input" name="evolution_api_url" value="{{ old('evolution_api_url', $profile->evolution_api_url ?: \App\Models\CompanyProfile::DEFAULT_EVOLUTION_API_URL) }}" placeholder="https://evolution.example.com" type="url">
                         </label>
 
                         <label class="space-y-2">
@@ -425,7 +449,26 @@
 
                         <label class="space-y-2 sm:col-span-2">
                             <span class="text-sm font-medium text-slate-300">{{ __('Instance Name') }}</span>
-                            <input class="app-input" name="evolution_instance_name" value="{{ old('evolution_instance_name', $profile->evolution_instance_name) }}" placeholder="my-whatsapp-instance">
+                            <input class="app-input" name="evolution_instance_name" value="{{ old('evolution_instance_name', $profile->evolution_instance_name ?: \App\Models\CompanyProfile::DEFAULT_EVOLUTION_INSTANCE_NAME) }}" placeholder="my-whatsapp-instance">
+                        </label>
+
+                        <label class="space-y-2 sm:col-span-2">
+                            <span class="text-sm font-medium text-slate-300">{{ __('Instance Dashboard URL') }}</span>
+                            <input class="app-input" name="evolution_dashboard_url" value="{{ old('evolution_dashboard_url', $profile->evolution_dashboard_url ?: \App\Models\CompanyProfile::DEFAULT_EVOLUTION_DASHBOARD_URL) }}" placeholder="{{ \App\Models\CompanyProfile::DEFAULT_EVOLUTION_DASHBOARD_URL }}" type="url">
+                            <p class="text-[11px] text-slate-500">{{ __('This opens the Evolution Manager page for this instance. It is separate from the API base URL used for sending messages.') }}</p>
+                        </label>
+
+                        <label class="space-y-2">
+                            <span class="text-sm font-medium text-slate-300">{{ __('Outgoing message color') }}</span>
+                            <input class="app-input h-10 w-full" name="evolution_outgoing_color" value="{{ old('evolution_outgoing_color', $profile->evolution_outgoing_color ?: '#005c4b') }}" type="color">
+                        </label>
+                        <label class="space-y-2">
+                            <span class="text-sm font-medium text-slate-300">{{ __('Incoming message color') }}</span>
+                            <input class="app-input h-10 w-full" name="evolution_incoming_color" value="{{ old('evolution_incoming_color', $profile->evolution_incoming_color ?: '#ffffff') }}" type="color">
+                        </label>
+                        <label class="space-y-2">
+                            <span class="text-sm font-medium text-slate-300">{{ __('Chat background color') }}</span>
+                            <input class="app-input h-10 w-full" name="evolution_chat_background" value="{{ old('evolution_chat_background', $profile->evolution_chat_background ?: '#0f172a') }}" type="color">
                         </label>
                     </div>
 
@@ -442,6 +485,56 @@
                         <div>
                             <p class="text-sm font-semibold text-emerald-300">{{ __('Notifications') }}</p>
                             <p class="mt-1 text-xs text-emerald-200/70">{{ __('When configured, the system will automatically send WhatsApp notifications to the sales manager for new leads, offers, and pipeline updates.') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {{-- SEO / Social Preview --}}
+            <section x-show="activeTab === 'seo'" x-cloak class="app-card app-card--gradient space-y-5">
+                <div>
+                    <h2 class="text-lg font-semibold text-white">{{ __('SEO & Social Sharing') }}</h2>
+                    <p class="text-sm text-slate-400">{{ __('The title, description and image shown when your site link is shared on WhatsApp, Facebook, Instagram and other platforms.') }}</p>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="space-y-2 sm:col-span-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M4 12h16M4 17h10" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            {{ __('SEO Title') }}
+                        </span>
+                        <input class="app-input" name="seo_title" value="{{ old('seo_title', $profile->seo_title) }}" placeholder="Venecia Developments — شقق فاخرة في أسيوط" maxlength="120">
+                        <p class="text-[11px] text-slate-500">{{ __('Used as the page title and the bold headline in social previews (max 120 characters).') }}</p>
+                    </label>
+
+                    <label class="space-y-2 sm:col-span-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h10M4 18h7" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            {{ __('SEO Description') }}
+                        </span>
+                        <textarea class="app-input min-h-24" name="seo_description" maxlength="500" placeholder="{{ __('رواد في صناعة التطوير العقاري والمجتمعات السكنية الفاخرة...') }}">{{ old('seo_description', $profile->seo_description) }}</textarea>
+                        <p class="text-[11px] text-slate-500">{{ __('The gray preview text under the link — keep it between 70 and 160 characters for best results.') }}</p>
+                    </label>
+
+                    <label class="space-y-2 sm:col-span-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="3" stroke-width="1.8"/><circle cx="9" cy="9" r="2" stroke-width="1.8"/><path d="m21 15-5-5L5 21" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            {{ __('Preview Image') }}
+                        </span>
+                        <input class="app-input file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-brand-500" type="file" name="seo_image" accept="image/png,image/jpg,image/jpeg,image/webp">
+                        @if ($profile->seo_image_path)
+                            <img src="{{ $profile->seo_image_path }}" alt="{{ __('Preview Image') }}" class="mt-2 h-32 w-auto max-w-full rounded-xl border border-white/10 bg-white object-contain p-1">
+                        @endif
+                        <p class="text-[11px] text-slate-500">{{ __('Recommended size 1200×630px (the image card shown when sharing the link). If empty, the company logo is used.') }}</p>
+                    </label>
+                </div>
+
+                <div class="rounded-xl bg-brand-500/10 border border-brand-500/20 p-4">
+                    <div class="flex items-start gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        <div>
+                            <p class="text-sm font-semibold text-brand-300">{{ __('Social sharing preview') }}</p>
+                            <p class="mt-1 text-xs text-brand-200/70">{{ __('When you share the site link on WhatsApp or Facebook, the card shows: the SEO title as the headline, the description below it, and the preview image on the side (1200×630).') }}</p>
                         </div>
                     </div>
                 </div>
@@ -598,7 +691,7 @@
                             {{ __('Trash retention period (days)') }}
                         </span>
                         <div class="relative">
-                            <input class="app-input pr-10" name="trash_retention_days" value="{{ old('trash_retention_days', $profile->trash_retention_days ?? 30) }}" placeholder="30" type="number" min="1" max="365" inputmode="numeric">
+                            <input class="app-input pr-10" name="trash_retention_days" value="{{ old('trash_retention_days', $profile->trash_retention_days ?? 30) }}" placeholder="30" type="number" min="1" max="365" inputmode="numeric" required>
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">{{ __('days') }}</span>
                         </div>
                         <p class="text-xs text-slate-500">{{ __('How many days an item can stay in the trash before automatic permanent deletion.') }}</p>
@@ -627,5 +720,48 @@
                 </button>
             </div>
         </form>
+
+        {{-- Notification preferences (personal, per signed-in user) --}}
+        <section x-show="activeTab === 'notifications'" x-cloak class="app-card app-card--gradient space-y-5">
+            <div>
+                <h2 class="text-lg font-semibold text-white">{{ __('Notification Preferences') }}</h2>
+                <p class="text-sm text-slate-400">{{ __('Choose which notifications you personally receive. Your role permissions decide what you are allowed to get; these toggles let you opt out of specific types.') }}</p>
+            </div>
+
+            <form method="POST" action="{{ route('dashboard.settings.notifications.update') }}" class="space-y-5">
+                @csrf
+                @method('PUT')
+
+                <div class="space-y-3">
+                    @forelse ($allowedTypes as $typeKey => $typeMeta)
+                        <label class="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-white/20">
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-white">{{ $typeMeta['title_'.app()->getLocale()] ?? $typeMeta['title_en'] }}</span>
+                                <span class="mt-0.5 block text-xs text-slate-500">{{ $typeMeta['permission'] }}</span>
+                            </span>
+                            <input
+                                type="checkbox"
+                                name="disabled_notifications[]"
+                                value="{{ $typeKey }}"
+                                {{ in_array($typeKey, $userPrefs, true) ? '' : 'checked' }}
+                                class="h-5 w-5 shrink-0 rounded border-white/20 bg-slate-800 text-brand-500 focus:ring-brand-500"
+                            >
+                        </label>
+                    @empty
+                        <div class="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                            <p class="text-sm text-slate-400">{{ __('Your role does not include any notification permissions yet. Ask an administrator to grant them.') }}</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-sm text-slate-400">{{ __('Unchecking a type stops future notifications of that kind from reaching you.') }}</p>
+                    <button type="submit" class="app-button">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        {{ __('Save Preferences') }}
+                    </button>
+                </div>
+            </form>
+        </section>
     </div>
 @endsection

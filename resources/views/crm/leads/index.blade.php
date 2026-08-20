@@ -17,6 +17,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('dashboard.crm.index') }}" class="app-button--ghost">{{ __('CRM Home') }}</a>
+                <a href="{{ route('dashboard.crm.data-transfer.index', ['type' => 'leads']) }}" class="app-button--ghost">{{ __('Import / Export') }}</a>
                 <a href="{{ route('dashboard.crm.quick') }}" class="app-button">{{ __('+ New Lead') }}</a>
             </div>
         </div>
@@ -112,8 +113,8 @@
 
                         <div class="mt-4 flex items-center gap-2">
                             <a href="{{ route('dashboard.crm.leads.show', $lead) }}" class="app-button w-full justify-center text-sm">{{ __('View') }}</a>
-                            @if ($waLink = \App\Support\WhatsApp::link($lead->whatsapp, $lead->phone))
-                                <a href="{{ $waLink }}" target="_blank" class="app-button--ghost shrink-0 p-2" aria-label="{{ __('WhatsApp') }}">
+                            @if (\App\Support\WhatsApp::number($lead->whatsapp ?? $lead->phone))
+                                <a href="{{ route('dashboard.whatsapp.index', ['phone' => $lead->whatsapp ?? $lead->phone, 'name' => $lead->name]) }}" class="app-button--ghost shrink-0 p-2" aria-label="{{ __('WhatsApp') }}">
                                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M.5 23.5l1.6-5.8A11.3 11.3 0 0 1 0 11.3C0 5.1 5.1 0 11.3 0A11.3 11.3 0 0 1 22.5 11.3c0 6.2-5.1 11.3-11.3 11.3-1.9 0-3.8-.5-5.5-1.3L.5 23.5Zm6-3.4.3.2a9.3 9.3 0 0 0 4.5 1.2c5.1 0 9.3-4.2 9.3-9.3S16.4 2.9 11.3 2.9 2 7.1 2 12.2c0 1.8.5 3.5 1.4 5l.2.3-1 3.6 3.9-1Zm9.2-4.3c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.6.1l-.9 1.1c-.1.1-.3.1-.5 0-.2-.1-.8-.3-1.6-.9-.7-.5-1.3-1.2-1.5-1.4-.2-.2 0-.4.1-.5l.4-.4c.1-.1.2-.3.3-.4.1-.1 0-.3 0-.4 0-.1-.6-1.5-.8-2-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.2-.8.7-.8 1.7 0 1 .8 1.9.9 2 .1.1 1.5 2.4 3.6 3.3.5.2.9.4 1.3.5.6.2 1.2.2 1.7.1.5-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1-.1-.1-.2-.2-.4-.3Z"/></svg>
                                 </a>
                             @endif

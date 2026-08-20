@@ -17,6 +17,7 @@ class PermissionSeeder extends Seeder
 
         $permissions = [
             'manage users',
+            'manage teams',
             'manage projects',
             'manage units',
             'manage crm',
@@ -75,6 +76,22 @@ class PermissionSeeder extends Seeder
             'view all whatsapp conversations',
             'reply whatsapp',
             'assign whatsapp',
+
+            // Own-trash visibility (data entry users can see only what they deleted)
+            'view own trash',
+
+            // Own profile editing
+            'edit own profile',
+
+            // Notification delivery (who is allowed to receive each type)
+            'receive notification.all',
+            'receive notification.customer',
+            'receive notification.offer',
+            'receive notification.plan',
+            'receive notification.whatsapp',
+            'receive notification.security',
+            'receive notification.followups',
+            'receive notification.trash',
         ];
 
         foreach ($permissions as $permission) {
@@ -88,11 +105,13 @@ class PermissionSeeder extends Seeder
         $marketing = Role::findOrCreate('Marketing Manager', 'web');
         $accountant = Role::findOrCreate('Accountant', 'web');
         $receptionist = Role::findOrCreate('Receptionist', 'web');
+        $dataEntry = Role::findOrCreate('Data Entry', 'web');
         $owner = Role::findOrCreate('Owner', 'web');
 
         $administrator->syncPermissions(Permission::all());
 
         $manager->syncPermissions([
+            'manage teams',
             'manage projects',
             'manage units',
             'manage crm',
@@ -133,6 +152,14 @@ class PermissionSeeder extends Seeder
             'delete follow-ups',
 
             'manage crm settings',
+
+            'receive notification.customer',
+            'receive notification.offer',
+            'receive notification.plan',
+            'receive notification.whatsapp',
+            'receive notification.security',
+            'receive notification.followups',
+            'receive notification.trash',
         ]);
 
         $executive->syncPermissions([
@@ -226,6 +253,15 @@ class PermissionSeeder extends Seeder
             'view own tasks',
             'create follow-ups',
             'view own follow-ups',
+        ]);
+
+        $dataEntry->syncPermissions([
+            'manage projects',
+            'manage units',
+            'view own trash',
+            'edit own profile',
+
+            'receive notification.trash',
         ]);
 
         $owner->syncPermissions(Permission::all());

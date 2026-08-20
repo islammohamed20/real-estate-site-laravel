@@ -26,6 +26,10 @@ class UnitRepository extends BaseRepository implements UnitRepositoryInterface
             $query->where('project_id', $filters['project_id']);
         }
 
+        if (! empty($filters['building_id'])) {
+            $query->where('building_id', (int) $filters['building_id']);
+        }
+
         if (! empty($filters['unit_type'])) {
             $query->where('unit_type', $filters['unit_type']);
         }

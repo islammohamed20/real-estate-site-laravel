@@ -104,6 +104,14 @@
                 <textarea id="notes" name="notes" rows="4" class="app-input min-h-24">{{ old('notes', $customer->notes) }}</textarea>
                 @error('notes')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
             </div>
+            <div>
+                <label for="preferred_locale" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Preferred email language') }}</label>
+                <select id="preferred_locale" name="preferred_locale" class="app-input">
+                    <option value="ar" @selected(old('preferred_locale', $customer->preferred_locale ?? 'ar'))>العربية</option>
+                    <option value="en" @selected(old('preferred_locale', $customer->preferred_locale) === 'en')>English</option>
+                </select>
+                @error('preferred_locale')<p class="mt-1 text-xs text-red-400">{{ $message }}</p>@enderror
+            </div>
         </div>
 
         <div class="flex items-center gap-3 border-b border-white/5 pb-4">

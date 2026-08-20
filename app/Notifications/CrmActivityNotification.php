@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Models\SalesTeam;
 use App\Models\User;
+use App\Support\NotificationRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
@@ -12,7 +14,7 @@ use Illuminate\Support\Facades\Notification as NotificationFacade;
 class CrmActivityNotification extends Notification
 {
     /**
-     * @param  'customer'|'offer'|'plan'|'whatsapp_unassigned'|'login_failed'  $type
+     * @param  'customer'|'offer'|'plan'|'whatsapp_unassigned'|'whatsapp_reassigned'|'login_failed'|'followup_overdue'  $type
      * @param  array<string, mixed>  $payload
      */
     public function __construct(
@@ -72,6 +74,36 @@ class CrmActivityNotification extends Notification
                 'conversation_id' => $this->payload['conversation_id'] ?? null,
                 'actor_name' => $this->actorName,
             ],
+            'whatsapp_sla' => [
+                'title_ar' => 'تنبيه SLA — عميل بانتظار الرد',
+                'title_en' => 'SLA alert — customer awaiting reply',
+                'message_ar' => 'المندوب '.($this->payload['rep_name'] ?? '—').' لم يرد على '.($this->payload['customer_name'] ?? $this->payload['customer_phone'] ?? '').' منذ '.($this->payload['minutes'] ?? 0).' دقيقة',
+                'message_en' => 'Rep '.($this->payload['rep_name'] ?? '—').' has not replied to '.($this->payload['customer_name'] ?? $this->payload['customer_phone'] ?? '').' for '.($this->payload['minutes'] ?? 0).' min',
+                'action_url' => $this->payload['action_url'] ?? '#',
+                'type' => 'whatsapp_sla',
+                'conversation_id' => $this->payload['conversation_id'] ?? null,
+                'actor_name' => $this->actorName,
+            ],
+            'whatsapp_reassigned' => [
+                'title_ar' => 'محادثة أُعيد ترحيلها تلقائيًا',
+                'title_en' => 'Conversation auto re-assigned',
+                'message_ar' => 'تم ترحيل محادثة العميل '.($this->payload['customer_name'] ?? '').' تلقائيًا لمندوب آخر بسبب تأخر الرد',
+                'message_en' => 'Customer conversation '.($this->payload['customer_name'] ?? '').' was auto re-assigned to another salesperson',
+                'action_url' => $this->payload['action_url'] ?? '#',
+                'type' => 'whatsapp_reassigned',
+                'conversation_id' => $this->payload['conversation_id'] ?? null,
+                'actor_name' => $this->actorName,
+            ],
+            'followup_overdue' => [
+                'title_ar' => 'متابعة متأخرة',
+                'title_en' => 'Overdue follow-up',
+                'message_ar' => 'موعد متابعة العميل '.($this->payload['name'] ?? '').' تأخر منذ '.($this->payload['hours'] ?? 1).' ساعة',
+                'message_en' => 'Follow-up for '.($this->payload['name'] ?? '').' is overdue by '.($this->payload['hours'] ?? 1).'h',
+                'action_url' => $this->payload['action_url'] ?? '#',
+                'type' => 'followup_overdue',
+                'lead_id' => $this->payload['lead_id'] ?? null,
+                'actor_name' => $this->actorName,
+            ],
             'login_failed' => [
                 'title_ar' => 'محاولة دخول فاشلة',
                 'title_en' => 'Failed login attempt',
@@ -99,13 +131,55 @@ class CrmActivityNotification extends Notification
     }
 
     /**
-     * Notify all Administrator and Sales Manager users.
+     * Notify every user allowed to receive this notification type:
+     * permission-gated by NotificationRegistry, then per-user opt-outs.
      */
     public static function notifyManagers(self $notification): void
     {
-        $recipients = User::query()
-            ->where(fn (Builder $query) => $query->role(['Administrator', 'Sales Manager']))
-            ->get();
+        $recipients = NotificationRegistry::recipients($notification->type);
+
+        if ($recipients->isNotEmpty()) {
+            NotificationFacade::send($recipients, $notification);
+        }
+    }
+
+    /**
+     * Team-aware delivery — each user only receives what concerns them:
+     *
+     * - Administrators & Owners: global visibility.
+     * - The record owner (e.g. the salesperson who owns the lead/customer):
+     *   notified when $includeOwner is true.
+     * - Sales Managers: only events of a team that includes $owner
+     *   (complete isolation between teams — other managers are skipped).
+     *
+     * When there is no owner context, only the global users receive it.
+     */
+    public static function notifyRelevant(self $notification, ?User $owner = null, bool $includeOwner = true): void
+    {
+        $recipients = NotificationRegistry::recipients($notification->type);
+
+        if ($owner instanceof User && $owner->is_active) {
+            $managerIds = SalesTeam::query()
+                ->whereHas('members', fn (Builder $query) => $query->whereKey($owner->id))
+                ->pluck('manager_id')
+                ->filter()
+                ->all();
+
+            $recipients = $recipients->filter(function (User $user) use ($owner, $managerIds, $includeOwner): bool {
+                if ($user->hasRole(['Administrator', 'Owner'])) {
+                    return true;
+                }
+
+                if ($user->id === $owner->id) {
+                    return $includeOwner;
+                }
+
+                return in_array($user->id, $managerIds, true);
+            })->values();
+        } else {
+            // No owner context → global visibility only.
+            $recipients = $recipients->filter(fn (User $user) => $user->hasRole(['Administrator', 'Owner']))->values();
+        }
 
         if ($recipients->isNotEmpty()) {
             NotificationFacade::send($recipients, $notification);

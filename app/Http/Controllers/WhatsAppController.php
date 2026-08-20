@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeadStage;
+use App\Events\LeadCreated;
+use App\Models\CompanyProfile;
 use App\Models\Crm\CrmDeal;
 use App\Models\Customer;
 use App\Models\Lead;
@@ -12,6 +15,8 @@ use App\Models\User;
 use App\Models\WhatsAppConversation;
 use App\Models\WhatsAppMessage;
 use App\Services\EvolutionApiService;
+use App\Services\FacebookMessengerService;
+use App\Support\SalesTeamAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,12 +40,11 @@ class WhatsAppController extends Controller
     public function index(Request $request): View
     {
         $user = Auth::user();
-        $canManage = $user->can('view all whatsapp conversations') || $user->can('assign whatsapp');
+        $profile = CompanyProfile::query()->first();
+        $canManage = $this->canManageConversations($user);
 
-        $query = WhatsAppConversation::query()
-            ->with(['assignedTo:id,name', 'linkedLead:id,name', 'linkedCustomer:id,name'])
-            // Sales reps see ONLY conversations assigned to them; managers see everything.
-            ->when(! $canManage, fn ($q) => $q->where('assigned_to', $user->id));
+        $query = $this->conversationQueryFor($user)
+            ->with(['assignedTo:id,name', 'linkedLead:id,name', 'linkedCustomer:id,name']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
@@ -50,8 +54,22 @@ class WhatsAppController extends Controller
 
         // Smart linking: find existing leads/customers that share the same phone.
         $phones = $conversations->pluck('customer_phone')->unique()->filter();
-        $existingLeads = Lead::query()->whereIn('phone', $phones)->get(['id', 'phone', 'name'])->groupBy('phone');
-        $existingCustomers = Customer::query()->whereIn('phone', $phones)->get(['id', 'phone', 'name'])->groupBy('phone');
+
+        // The phone we were asked to open may not have a conversation yet.
+        $openPhoneRaw = $request->string('phone')->toString();
+        $openPhone = $openPhoneRaw !== '' ? \App\Support\WhatsApp::number($openPhoneRaw) : null;
+        if ($openPhone !== null) {
+            $phones = $phones->push($openPhone)->unique()->filter();
+        }
+
+        $existingLeads = Lead::query()
+            ->whereIn('phone', $phones)
+            ->get(['id', 'phone', 'name', 'budget', 'stage'])
+            ->groupBy(fn (Lead $l) => \App\Support\WhatsApp::number($l->phone) ?? $l->phone);
+        $existingCustomers = Customer::query()
+            ->whereIn('phone', $phones)
+            ->get(['id', 'phone', 'name'])
+            ->groupBy(fn (Customer $c) => \App\Support\WhatsApp::number($c->phone) ?? $c->phone);
 
         $templates = MessageTemplate::query()
             ->where('is_active', true)
@@ -60,8 +78,13 @@ class WhatsAppController extends Controller
 
         $salesUsers = $canManage
             ? User::query()
-                ->whereHas('roles', fn ($q) => $q->whereIn('name', ['Sales Executive', 'Sales Manager', 'Administrator', 'Marketing Manager']))
-                ->orWhereHas('permissions', fn ($q) => $q->where('name', 'reply whatsapp'))
+                ->whereIn('id', SalesTeamAccess::isGlobal()
+                    ? User::query()->pluck('id')
+                    : SalesTeamAccess::manageableUserIds())
+                ->where(function ($query): void {
+                    $query->whereHas('roles', fn ($q) => $q->whereIn('name', ['Sales Executive', 'Sales Manager', 'Administrator', 'Marketing Manager']))
+                        ->orWhereHas('permissions', fn ($q) => $q->where('name', 'reply whatsapp'));
+                })
                 ->orderBy('name')
                 ->get(['id', 'name'])
             : collect();
@@ -82,7 +105,13 @@ class WhatsAppController extends Controller
                 'body' => $t->body,
             ])->values(),
             'salesUsersJson' => $salesUsers->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
-            'existingLeadsJson' => $existingLeads->map->map(fn (Lead $l) => ['id' => $l->id, 'name' => $l->name])->toArray(),
+            'existingLeadsJson' => $existingLeads->map->map(fn (Lead $l) => [
+                'id' => $l->id,
+                'name' => $l->name,
+                'budget' => $l->budget,
+                'stage' => $l->stage?->value,
+                'stage_label' => $l->stage !== null ? __($l->stage->label()) : null,
+            ])->toArray(),
             'existingCustomersJson' => $existingCustomers->map->map(fn (Customer $c) => ['id' => $c->id, 'name' => $c->name])->toArray(),
             'plansJson' => $plans->map(fn (\App\Models\InstallmentPlan $plan) => [
                 'id' => $plan->id,
@@ -96,6 +125,13 @@ class WhatsAppController extends Controller
             'canManage' => $canManage,
             'evolutionConfigured' => $this->evolution->isConfigured(),
             'connectionOpen' => $this->evolution->checkConnection(),
+            'evolutionDashboardUrl' => $profile?->evolution_dashboard_url ?: CompanyProfile::DEFAULT_EVOLUTION_DASHBOARD_URL,
+            'outgoingColor' => $profile?->evolution_outgoing_color ?: '#005c4b',
+            'incomingColor' => $profile?->evolution_incoming_color ?: '#ffffff',
+            'chatBackground' => $profile?->evolution_chat_background ?: '#0f172a',
+            'openPhone' => $request->string('phone')->toString(),
+            'openName' => $request->string('name')->toString(),
+            'canCreateLeads' => Auth::user()->can('create leads') || Auth::user()->can('manage crm'),
             'baseUrl' => url('/'),
         ]);
     }
@@ -106,11 +142,10 @@ class WhatsAppController extends Controller
     public function conversations(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $canManage = $user->can('view all whatsapp conversations') || $user->can('assign whatsapp');
+        $canManage = $this->canManageConversations($user);
 
-        $query = WhatsAppConversation::query()
-            ->with(['assignedTo:id,name'])
-            ->when(! $canManage, fn ($q) => $q->where(fn ($q2) => $q2->where('assigned_to', $user->id)->orWhereNull('assigned_to')));
+        $query = $this->conversationQueryFor($user)
+            ->with(['assignedTo:id,name']);
 
         if ($request->filled('status') && $request->string('status')->toString() !== 'all') {
             $query->where('status', $request->string('status')->toString());
@@ -143,6 +178,7 @@ class WhatsAppController extends Controller
                 'id' => $m->id,
                 'direction' => $m->direction,
                 'body' => $m->body,
+                'reactions' => $m->reactions ?? [],
                 'message_type' => $m->message_type,
                 'media_name' => $m->media_name,
                 'media_path' => $m->media_path,
@@ -176,7 +212,15 @@ class WhatsAppController extends Controller
 
         // Try to deliver via the gateway first — the message is only stored
         // locally if the gateway accepted it (or is not configured yet).
-        $sent = $this->evolution->sendMessage($conversation->customer_phone, $body);
+        // Route message based on platform
+        if ($conversation->isFacebook()) {
+            $sent = app(\App\Services\FacebookMessengerService::class)->sendText(
+                $conversation->platform_user_id,
+                $body
+            );
+        } else {
+            $sent = $this->evolution->sendMessage($conversation->customer_phone, $body);
+        }
 
         $message = $conversation->messages()->create([
             'direction' => WhatsAppMessage::DIRECTION_OUTGOING,
@@ -213,11 +257,20 @@ class WhatsAppController extends Controller
      */
     public function assign(Request $request, WhatsAppConversation $conversation): JsonResponse
     {
-        abort_unless(Auth::user()->can('assign whatsapp'), 403);
+        $user = Auth::user();
+        abort_unless($this->canManageConversations($user), 403);
+        $this->authorizeConversation($conversation);
 
         $validated = $request->validate([
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        // A Sales Manager can only assign conversations to members of their
+        // own team (or leave them unassigned). Only global users can assign
+        // across the whole sales organization.
+        if (! SalesTeamAccess::isGlobal() && ! empty($validated['user_id'])) {
+            abort_unless(in_array((int) $validated['user_id'], SalesTeamAccess::manageableUserIds(), true), 403);
+        }
 
         $conversation->update([
             'assigned_to' => $validated['user_id'] ?? null,
@@ -406,6 +459,40 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Rename the customer on a conversation (display name).
+     */
+    public function renameConversation(Request $request, WhatsAppConversation $conversation): JsonResponse
+    {
+        $this->authorizeConversation($conversation);
+        abort_unless(Auth::user()->can('reply whatsapp'), 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $conversation->update(['customer_name' => trim($validated['name'])]);
+
+        return response()->json([
+            'success' => true,
+            'conversation' => $this->conversationPayload($conversation->fresh(['assignedTo:id,name'])),
+        ]);
+    }
+
+    /**
+     * Soft-delete a conversation — it moves to the dashboard trash.
+     */
+    public function destroyConversation(WhatsAppConversation $conversation): JsonResponse
+    {
+        abort_unless(Auth::user()->can('view all whatsapp conversations') || Auth::user()->can('assign whatsapp'), 403);
+
+        $conversation->delete();
+
+        Log::info("WhatsApp conversation #{$conversation->id} moved to trash by user ".Auth::id());
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Link the conversation to an existing CRM lead or customer.
      */
     public function link(Request $request, WhatsAppConversation $conversation): JsonResponse
@@ -419,6 +506,15 @@ class WhatsAppController extends Controller
 
         $conversation->update($validated);
 
+        // Pull the stored CRM name onto the conversation so the panel shows
+        // the lead/customer name automatically.
+        if (! empty($validated['linked_lead_id'])) {
+            $lead = Lead::query()->find($validated['linked_lead_id']);
+            if ($lead !== null && ! empty($lead->name)) {
+                $conversation->update(['customer_name' => $lead->name]);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'conversation' => $this->conversationPayload($conversation->fresh(['linkedLead:id,name', 'linkedCustomer:id,name'])),
@@ -427,32 +523,92 @@ class WhatsAppController extends Controller
 
     /**
      * Create a lead from the conversation (quick CRM hand-off).
+     *
+     * Mirrors the regular CRM lead creation (LeadCreationService): links an
+     * existing customer by phone, reuses an existing lead instead of
+     * duplicating, fills the WhatsApp number and a context note, and fires the
+     * same LeadCreated event so managers are notified.
      */
     public function createLead(Request $request, WhatsAppConversation $conversation): JsonResponse
     {
         $this->authorizeConversation($conversation);
+        abort_unless(Auth::user()->can('create leads') || Auth::user()->can('manage crm'), 403);
 
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'budget' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $lead = DB::transaction(function () use ($conversation, $validated): Lead {
+        $phone = \App\Support\WhatsApp::number($conversation->customer_phone);
+        if ($phone === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Invalid phone number on this conversation.'),
+            ], 422);
+        }
+
+        // Already linked — return the existing lead instead of a duplicate.
+        if ($conversation->linked_lead_id !== null) {
+            return response()->json([
+                'success' => true,
+                'lead_id' => $conversation->linked_lead_id,
+                'message' => __('Conversation is already linked to a lead.'),
+            ]);
+        }
+
+        $lead = DB::transaction(function () use ($conversation, $validated, $phone): Lead {
+            // Reuse an existing lead with the same phone — no duplicates.
+            $existing = Lead::query()
+                ->where(fn ($q) => $q->where('phone', $phone)->orWhere('whatsapp', $phone))
+                ->withTrashed()
+                ->latest('id')
+                ->first();
+
+            if ($existing !== null) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+                $existing->update([
+                    'source' => $existing->source ?: 'WhatsApp',
+                    'assigned_sales_id' => $existing->assigned_sales_id ?? $conversation->assigned_to,
+                ]);
+
+                return $existing;
+            }
+
+            $customer = Customer::query()->where('phone', $phone)->first();
+
+            $lastMessage = $conversation->messages()->latest('id')->first();
+
             return Lead::create([
-                'name' => ! empty($validated['name']) ? $validated['name'] : ($conversation->customer_name ?: __('WhatsApp Customer')),
-                'phone' => $conversation->customer_phone,
-                'source' => 'WhatsApp',
+                'customer_id' => $customer?->id,
                 'assigned_sales_id' => $conversation->assigned_to,
+                'name' => ! empty($validated['name']) ? $validated['name'] : ($conversation->customer_name ?: __('WhatsApp Customer')),
+                'phone' => $phone,
+                'whatsapp' => $phone,
                 'budget' => $validated['budget'] ?? null,
+                'stage' => LeadStage::New,
+                'status' => 'active',
+                'priority' => 'normal',
+                'source' => 'WhatsApp',
+                'notes' => $lastMessage !== null
+                    ? __('Inquiry from WhatsApp:').' '.mb_substr($lastMessage->body, 0, 500)
+                    : null,
             ]);
         });
+
+        if ($lead->wasRecentlyCreated) {
+            LeadCreated::dispatch($lead);
+        }
 
         $conversation->update(['linked_lead_id' => $lead->id]);
 
         return response()->json([
             'success' => true,
             'lead_id' => $lead->id,
-            'message' => __('Lead created and linked to this conversation.'),
+            'message' => $lead->wasRecentlyCreated
+                ? __('Lead created and linked to this conversation.')
+                : __('Linked to the existing lead for this number.'),
         ]);
     }
 
@@ -497,7 +653,7 @@ class WhatsAppController extends Controller
      */
     public function registerWebhook(Request $request): JsonResponse
     {
-        abort_unless(Auth::user()->can('view all whatsapp conversations') || Auth::user()->can('assign whatsapp'), 403);
+        abort_unless(SalesTeamAccess::isGlobal(), 403);
 
         $webhookUrl = rtrim(url('/'), '/').'/webhook/whatsapp/evolution';
         $ok = $this->evolution->setWebhook($webhookUrl);
@@ -701,11 +857,36 @@ class WhatsAppController extends Controller
     protected function authorizeConversation(WhatsAppConversation $conversation): void
     {
         $user = Auth::user();
-        if ($user->can('view all whatsapp conversations') || $user->can('assign whatsapp')) {
+
+        if (SalesTeamAccess::isGlobal()) {
             return;
         }
 
-        abort_unless($conversation->assigned_to === $user->id, 403);
+        // Sales Managers (like sales reps) can only access conversations
+        // explicitly assigned to them — not team or unassigned conversations.
+        abort_unless((int) $conversation->assigned_to === (int) $user->id, 403);
+    }
+
+    /**
+     * Whether the user may manage conversations (assign/review team inbox).
+     * The permission is still required, but team scope is enforced separately.
+     */
+    protected function canManageConversations(User $user): bool
+    {
+        return $user->can('view all whatsapp conversations') || $user->can('assign whatsapp');
+    }
+
+    /**
+     * Server-side inbox scope:
+     * global users see all; sales reps and sales managers see only their
+     * own assigned conversations (managers do NOT see unassigned inbox items
+     * or team conversations — only what is explicitly assigned to them).
+     */
+    protected function conversationQueryFor(User $user)
+    {
+        return WhatsAppConversation::query()->when(! SalesTeamAccess::isGlobal(), function ($query) use ($user): void {
+            $query->where('assigned_to', $user->id);
+        });
     }
 
     protected function conversationPayload(WhatsAppConversation $c): array
@@ -721,9 +902,13 @@ class WhatsAppController extends Controller
             'linked_lead_name' => $c->linkedLead?->name,
             'linked_customer_id' => $c->linked_customer_id,
             'linked_customer_name' => $c->linkedCustomer?->name,
+            'budget' => $c->linkedLead?->budget ?? $c->linkedCustomer?->budget,
             'unread_count' => (int) $c->unread_count,
             'last_message_at' => $c->last_message_at?->diffForHumans(),
             'last_message_raw' => $c->last_message_at?->toDateTimeString(),
+            'platform' => $c->platform ?? 'whatsapp',
+            'platform_label' => $c->platform_label ?? 'WhatsApp',
+                        'platform_icon' => $c->platform_icon ?? 'whatsapp',
         ];
     }
 }

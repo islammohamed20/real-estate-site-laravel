@@ -48,9 +48,13 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Reserved at') }}</p>
                 <p class="mt-1 text-lg font-semibold text-white">{{ $reservation->reserved_at?->format('Y-m-d H:i') }}</p>
             </div>
-            <div class="app-card app-card--gradient p-4">
+            <div class="app-card app-card--gradient p-4" x-data="reservationCountdown('{{ $reservation->expires_at?->toIso8601String() }}')" x-init="start()">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Expires at') }}</p>
                 <p class="mt-1 text-lg font-semibold text-white">{{ $reservation->expires_at?->format('Y-m-d H:i') }}</p>
+                <p class="mt-1 text-sm font-bold" :class="expired ? 'text-rose-400' : (critical ? 'text-amber-300' : 'text-emerald-300')">
+                    <span x-text="label"></span>
+                    <template x-if="!expired"><span class="text-slate-400">{{ __('remaining') }}</span></template>
+                </p>
             </div>
         </div>
 
@@ -63,3 +67,38 @@
     </section>
 </div>
 @endsection
+
+@push('scripts')
+    <script>
+        function reservationCountdown(expiresAt) {
+            return {
+                label: '',
+                expired: false,
+                critical: false,
+                timer: null,
+                start() {
+                    const tick = () => {
+                        if (!expiresAt) {
+                            this.label = '—';
+                            return;
+                        }
+                        const diff = new Date(expiresAt).getTime() - Date.now();
+                        if (diff <= 0) {
+                            this.expired = true;
+                            this.critical = false;
+                            this.label = '{{ __('Expired') }}';
+                            return;
+                        }
+                        const d = Math.floor(diff / 86400000);
+                        const h = Math.floor((diff % 86400000) / 3600000);
+                        const m = Math.floor((diff % 3600000) / 60000);
+                        this.label = (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm';
+                        this.critical = diff < 86400000;
+                    };
+                    tick();
+                    this.timer = setInterval(tick, 30000);
+                }
+            };
+        }
+    </script>
+@endpush

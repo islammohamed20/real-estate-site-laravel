@@ -6,10 +6,9 @@ namespace App\Console\Commands\Crm;
 
 use App\Models\CompanyProfile;
 use App\Models\InstallmentPlan;
-use App\Models\User;
 use App\Notifications\TrashedPlansPurgeWarning;
+use App\Support\NotificationRegistry;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Notification;
 
@@ -75,12 +74,10 @@ class WarnTrashedPlans extends Command
             'deleted_at' => (string) $plan->deleted_at,
         ])->values()->all();
 
-        $recipients = User::query()
-            ->where(fn (Builder $query) => $query->role(['Administrator', 'Sales Manager']))
-            ->get();
+        $recipients = NotificationRegistry::recipients('trash_warning');
 
         if ($recipients->isEmpty()) {
-            $this->warn('No Administrator/Sales Manager users to notify.');
+            $this->warn('No users allowed to receive trash warnings.');
 
             return self::FAILURE;
         }

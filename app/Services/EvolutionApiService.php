@@ -18,9 +18,16 @@ class EvolutionApiService
     {
         $profile = CompanyProfile::query()->first();
 
-        $this->apiUrl = $profile?->evolution_api_url;
-        $this->apiKey = $profile?->evolution_api_key;
-        $this->instanceName = $profile?->evolution_instance_name;
+        // Environment configuration is the source of truth for deployment
+        // secrets. CompanyProfile remains a dashboard-editable fallback.
+        $this->apiUrl = config('services.evolution.api_url')
+            ?: $profile?->evolution_api_url
+            ?: CompanyProfile::DEFAULT_EVOLUTION_API_URL;
+        $this->apiKey = config('services.evolution.api_key')
+            ?: $profile?->evolution_api_key;
+        $this->instanceName = config('services.evolution.instance_name')
+            ?: $profile?->evolution_instance_name
+            ?: CompanyProfile::DEFAULT_EVOLUTION_INSTANCE_NAME;
     }
 
     /**
@@ -49,7 +56,7 @@ class EvolutionApiService
                 return false;
             }
 
-            $url = rtrim($this->apiUrl, '/').'/message/sendText/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/message/sendText/'.rawurlencode($this->instanceName);
 
             $response = Http::withHeaders([
                 'apikey' => $this->apiKey,
@@ -78,13 +85,15 @@ class EvolutionApiService
     public function sendToSalesManager(string $message): bool
     {
         $profile = CompanyProfile::query()->first();
+        $number = config('services.evolution.sales_manager_whatsapp')
+            ?: $profile?->sales_manager_whatsapp;
 
-        if ($profile === null || empty($profile->sales_manager_whatsapp)) {
+        if (empty($number)) {
             Log::warning('Sales manager WhatsApp number is not configured.');
             return false;
         }
 
-        return $this->sendMessage($profile->sales_manager_whatsapp, $message);
+        return $this->sendMessage($number, $message);
     }
 
     /**
@@ -97,13 +106,15 @@ class EvolutionApiService
         }
 
         try {
-            $url = rtrim($this->apiUrl, '/').'/instance/connectionState/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/instance/connectionState/'.rawurlencode($this->instanceName);
 
             $response = Http::withHeaders([
                 'apikey' => $this->apiKey,
             ])->get($url);
 
-            return $response->successful() && $response->json('state') === 'open';
+            $state = $response->json('instance.state') ?? $response->json('state');
+
+            return $response->successful() && $state === 'open';
         } catch (\Exception $e) {
             Log::error("Error checking Evolution API connection: ".$e->getMessage());
             return false;
@@ -129,7 +140,7 @@ class EvolutionApiService
                 return false;
             }
 
-            $url = rtrim($this->apiUrl, '/').'/message/sendMedia/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/message/sendMedia/'.rawurlencode($this->instanceName);
 
             $payload = [
                 'number' => $normalizedNumber,
@@ -171,7 +182,7 @@ class EvolutionApiService
         }
 
         try {
-            $url = rtrim($this->apiUrl, '/').'/webhook/set/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/webhook/set/'.rawurlencode($this->instanceName);
 
             $response = Http::withHeaders([
                 'apikey' => $this->apiKey,
@@ -208,11 +219,12 @@ class EvolutionApiService
         }
 
         try {
-            $url = rtrim($this->apiUrl, '/').'/chat/findChats/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/chat/findChats/'.rawurlencode($this->instanceName);
 
             $response = Http::withHeaders([
                 'apikey' => $this->apiKey,
-            ])->get($url, ['limit' => $limit]);
+                'Content-Type' => 'application/json',
+            ])->post($url, ['limit' => $limit]);
 
             if ($response->successful()) {
                 return $response->json() ?: [];
@@ -229,24 +241,25 @@ class EvolutionApiService
     /**
      * Fetch recent messages of a specific chat (used by the polling fallback).
      */
-    public function getChatMessages(string $chatId, int $limit = 20): array
+    public function getChatMessages(?string $chatId = null, int $limit = 20): array
     {
         if (! $this->isConfigured()) {
             return [];
         }
 
         try {
-            $url = rtrim($this->apiUrl, '/').'/chat/findMessages/'.$this->instanceName;
+            $url = rtrim($this->apiUrl, '/').'/chat/findMessages/'.rawurlencode($this->instanceName);
 
             $response = Http::withHeaders([
                 'apikey' => $this->apiKey,
-            ])->get($url, [
+                'Content-Type' => 'application/json',
+            ])->post($url, [
                 'chatId' => $chatId,
                 'limit' => $limit,
             ]);
 
             if ($response->successful()) {
-                return $response->json() ?: [];
+                return $response->json('messages.records') ?: [];
             }
 
             Log::warning("Failed to fetch messages for {$chatId}: ".$response->body());

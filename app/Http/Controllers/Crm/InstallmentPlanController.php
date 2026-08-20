@@ -12,9 +12,11 @@ use App\Models\InstallmentPlan;
 use App\Models\InstallmentPlanItem;
 use App\Models\Offer;
 use App\Models\Unit;
+use App\Services\PushNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
@@ -57,11 +59,155 @@ class InstallmentPlanController extends Controller
 
         $validated = $request->validate([
             'paid_amount' => ['required', 'numeric', 'min:0', 'max:'.(float) $item->amount],
+            'payment_method' => ['nullable', 'string', 'max:50'],
+            'payment_notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $item->update(['paid_amount' => $validated['paid_amount']]);
+        $previousPaid = (float) $item->paid_amount;
+        $newPaid = (float) $validated['paid_amount'];
+        $isFullPayment = $newPaid >= (float) $item->amount && (float) $item->amount > 0;
+
+        $updateData = [
+            'paid_amount' => $newPaid,
+        ];
+
+        if ($isFullPayment && $previousPaid < (float) $item->amount) {
+            $updateData['paid_at'] = now();
+            $updateData['paid_by'] = auth()->user()?->name ?? 'System';
+        } elseif ($newPaid === 0) {
+            $updateData['paid_at'] = null;
+            $updateData['paid_by'] = null;
+        }
+
+        if (! empty($validated['payment_method'])) {
+            $updateData['payment_method'] = $validated['payment_method'];
+        }
+        if (! empty($validated['payment_notes'])) {
+            $updateData['payment_notes'] = $validated['payment_notes'];
+        }
+
+        $item->update($updateData);
+
+        $plan->load('customer');
+        $clientName = $plan->customer?->name ?? __('Customer');
+        $installmentLabel = $item->installment_number ?? $item->id;
+        $statusText = $isFullPayment ? '✅ سداد كامل' : '💰 دفعة جزئية';
+
+        app(PushNotificationService::class)->notifyCrmEvent(
+            $statusText,
+            $clientName.' — '.number_format($newPaid).' EGP (قسط #'.$installmentLabel.')',
+            '/real-statement-control/crm/plans/'.$plan->id
+        );
 
         return back()->with('status', __('Installment payment updated successfully.'));
+    }
+
+    public function fullPay(InstallmentPlan $plan, InstallmentPlanItem $item): RedirectResponse
+    {
+        $this->authorize('update', $plan);
+
+        $remaining = max(0, (float) $item->amount - (float) $item->paid_amount);
+
+        $item->update([
+            'paid_amount' => $item->amount,
+            'paid_at' => now(),
+            'paid_by' => auth()->user()?->name ?? 'System',
+            'payment_method' => $item->payment_method ?? 'cash',
+        ]);
+
+        $plan->load('customer');
+        $clientName = $plan->customer?->name ?? __('Customer');
+
+        app(PushNotificationService::class)->notifyCrmEvent(
+            '✅ سداد كامل للقسط',
+            $clientName.' — '.number_format($remaining).' EGP (قسط #'.($item->installment_number ?? $item->id).')',
+            '/real-statement-control/crm/plans/'.$plan->id
+        );
+
+        return back()->with('status', __('Installment fully paid successfully.'));
+    }
+
+    public function fullPayAll(InstallmentPlan $plan): RedirectResponse
+    {
+        $this->authorize('update', $plan);
+
+        $items = $plan->items()->where('paid_amount', '<', DB::raw('amount'))->get();
+
+        foreach ($items as $item) {
+            $item->update([
+                'paid_amount' => $item->amount,
+                'paid_at' => now(),
+                'paid_by' => auth()->user()?->name ?? 'System',
+            ]);
+        }
+
+        $plan->load('customer');
+        $clientName = $plan->customer?->name ?? __('Customer');
+
+        app(PushNotificationService::class)->notifyCrmEvent(
+            '✅ سداد جميع الأقساط',
+            $clientName.' — '.$items->count().' قسط (إجمالي: '.number_format((float) $plan->remaining_amount).')',
+            '/real-statement-control/crm/plans/'.$plan->id
+        );
+
+        return back()->with('status', __('All installments paid successfully.'));
+    }
+
+    public function receipt(InstallmentPlan $plan, InstallmentPlanItem $item): Response
+    {
+        $plan->load(['customer', 'unit.project', 'unit.building', 'unit.floor', 'creator']);
+
+        $company = CompanyProfile::query()->first();
+        $isArabic = app()->getLocale() === 'ar';
+
+        $html = view('crm.plans.receipt', [
+            'plan' => $plan,
+            'item' => $item,
+            'company' => $company,
+            'logoDataUri' => $this->imageDataUri($company?->logo_dark_path ?? $company?->logo_path),
+            'isArabic' => $isArabic,
+        ])->render();
+
+        $defaultConfig = (new ConfigVariables)->getDefaults();
+        $defaultFontConfig = (new FontVariables)->getDefaults();
+
+        $tempDir = storage_path('mpdf-temp');
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => [120, 200],
+            'orientation' => 'P',
+            'tempDir' => $tempDir,
+            'fontDir' => array_merge($defaultConfig['fontDir'], [public_path('fonts')]),
+            'fontdata' => $defaultFontConfig['fontdata'] + [
+                'tajawal' => [
+                    'R' => 'Tajawal-Regular.ttf',
+                    'B' => 'Tajawal-Bold.ttf',
+                ],
+            ],
+            'default_font' => 'tajawal',
+            'default_font_size' => 10,
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'autoScriptToLang' => true,
+            'autoLangToFont' => true,
+        ]);
+
+        $mpdf->SetDirectionality($isArabic ? 'rtl' : 'ltr');
+        $mpdf->WriteHTML($html);
+
+        $filename = 'receipt-plan-'.$plan->id.'-item-'.$item->id.'-'.now()->format('Ymd-His').'.pdf';
+        $content = $mpdf->Output('', 'S');
+
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function destroy(InstallmentPlan $plan): RedirectResponse
@@ -70,7 +216,6 @@ class InstallmentPlanController extends Controller
 
         $this->logPlanAction($plan, 'installment_plan.deleted', ['deleted_at' => (string) now()]);
 
-        // Soft delete: the plan (and its items, which are kept so paid amounts survive) goes to the trash.
         $plan->delete();
 
         return redirect()->route('dashboard.crm.plans.index')->with('status', __('Installment plan moved to trash.'));
@@ -108,7 +253,6 @@ class InstallmentPlanController extends Controller
 
         $this->logPlanAction($plan, 'installment_plan.force_deleted');
 
-        // Detach any offer that references this plan, then hard delete (items cascade via FK).
         Offer::query()->where('installment_plan_id', $plan->id)->update(['installment_plan_id' => null]);
         $plan->forceDelete();
 
@@ -205,9 +349,6 @@ class InstallmentPlanController extends Controller
         ]);
     }
 
-    /**
-     * Record a plan operation (delete / restore / force delete) in the activity log.
-     */
     private function logPlanAction(InstallmentPlan $plan, string $event, array $newValues = []): void
     {
         AuditLog::create([
@@ -236,9 +377,6 @@ class InstallmentPlanController extends Controller
         ]);
     }
 
-    /**
-     * Turn a stored asset URL into a base64 data URI so mPDF can embed it offline.
-     */
     private function imageDataUri(?string $url): ?string
     {
         if (empty($url)) {

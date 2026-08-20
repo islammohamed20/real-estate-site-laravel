@@ -33,17 +33,13 @@
                         __('Excellence %') => $result['excellence_percent'] . '%',
                         __('Excellence Amount') => $result['excellence_amount'],
                         __('Base Price with Excellence') => $result['base_price_with_excellence'],
-                        __('Discount') => $result['discount_amount'],
-                        __('Down Payment Discount') => $result['down_payment_bonus_percent'] . '% · ' . number_format((float) $result['down_payment_discount'], 2),
+                        __('Discount') => $result['down_payment_bonus_percent'] . '% · ' . number_format((float) $result['discount_amount'], 2),
                         __('Final Price') => $result['final_price'],
                         __('Maintenance %') => $result['maintenance_percent'] . '%',
                         __('Maintenance Deposit') => $result['maintenance_deposit'],
                         __('Remaining') => $result['remaining'],
                         __('Installment Amount') => $result['installment_amount'],
                     ] as $label => $value)
-                        @if ($label === __('Down Payment Discount') && (float) $result['down_payment_bonus_percent'] <= 0)
-                            @continue
-                        @endif
                         <div class="touch-card min-w-0 p-3">
                             <p class="touch-card__label min-w-0">{{ $label }}</p>
                             <p class="mt-1.5 min-w-0 break-words text-sm font-bold text-white sm:text-base">{{ is_numeric($value) ? number_format((float) $value, 2) : $value }}</p>

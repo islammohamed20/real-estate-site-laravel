@@ -10,53 +10,61 @@
         </a>
 
         <section class="app-card space-y-5 p-6 sm:p-8">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="badge badge-brand">{{ __($project->status) }}</span>
-                @if ($project->featured)
-                    <span class="badge badge-violet">{{ __('★ Featured') }}</span>
-                @endif
-                @if ($project->published_at)
-                    <span class="badge badge-muted">{{ __('Published :date', ['date' => $project->published_at->format('M j, Y')]) }}</span>
-                @endif
-            </div>
-
             <div>
-                <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ $project->name }}</h1>
-                <p class="mt-3 flex items-center gap-1.5 text-sm text-slate-400">
-                    <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                        <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z" stroke-width="1.8"/>
-                        <circle cx="12" cy="10" r="2.5" stroke-width="1.8"/>
-                    </svg>
-                    {{ $project->location ?? __('Location pending') }}
-                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="badge badge-brand">{{ __($project->status) }}</span>
+                    @if ($project->featured)
+                        <span class="badge badge-violet">{{ __('★ Featured') }}</span>
+                    @endif
+                </div>
+
+                <h1 class="mt-3 min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ $project->name }}</h1>
+
+                    {{-- Location + compact glass stat cards --}}
+                    <div class="mt-3 flex min-w-0 max-w-full flex-wrap items-center gap-x-6 gap-y-3">
+                        <p class="flex min-w-0 max-w-full items-start gap-1.5 text-sm leading-6 text-slate-400">
+                            <svg class="mt-1 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                                <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z" stroke-width="1.8"/>
+                                <circle cx="12" cy="10" r="2.5" stroke-width="1.8"/>
+                            </svg>
+                            <span class="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{ $project->location ?? __('Location pending') }}</span>
+                        </p>
+
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            {{-- City --}}
+                            <div class="touch-card px-3 py-2">
+                                <p class="touch-card__label text-[10px]">{{ __('City') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->city ?? __('—') }}</p>
+                            </div>
+
+                            {{-- Country --}}
+                            <div class="touch-card px-3 py-2">
+                                <p class="touch-card__label text-[10px]">{{ __('Country') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->country ?? __('—') }}</p>
+                            </div>
+
+                            {{-- Phases --}}
+                            <div class="touch-card px-3 py-2">
+                                <p class="touch-card__label text-[10px]">{{ __('Phases') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->phases->count() }}</p>
+                            </div>
+
+                            {{-- Units --}}
+                            <div class="touch-card px-3 py-2">
+                                <p class="touch-card__label text-[10px]">{{ __('Units') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->units_count ?? $project->units->count() }}</p>
+                            </div>
+                        </div>
+                    </div>
             </div>
 
             @if ($project->description)
                 <p class="max-w-2xl text-sm leading-7 text-slate-400 sm:text-base">{{ $project->description }}</p>
             @endif
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div class="touch-card">
-                    <p class="touch-card__label">{{ __('City') }}</p>
-                    <p class="mt-2 font-semibold text-white">{{ $project->city ?? __('—') }}</p>
-                </div>
-                <div class="touch-card">
-                    <p class="touch-card__label">{{ __('Country') }}</p>
-                    <p class="mt-2 font-semibold text-white">{{ $project->country ?? __('—') }}</p>
-                </div>
-                <div class="touch-card">
-                    <p class="touch-card__label">{{ __('Phases') }}</p>
-                    <p class="mt-2 font-semibold text-white">{{ $project->phases->count() }}</p>
-                </div>
-                <div class="touch-card">
-                    <p class="touch-card__label">{{ __('Units') }}</p>
-                    <p class="mt-2 font-semibold text-white">{{ $project->units_count ?? $project->units->count() }}</p>
-                </div>
-            </div>
-
-            <div class="flex flex-col gap-3 sm:flex-row">
-                <a href="{{ route('installments.index', ['project_id' => $project->id]) }}" class="app-button flex-1">{{ __('Plan a purchase') }}</a>
-                <a href="#units" class="app-button--ghost flex-1">{{ __('View units') }}</a>
+            <div class="flex flex-row items-center justify-center gap-3">
+                <a href="{{ route('installments.index', ['project_id' => $project->id]) }}" class="app-button min-w-0 flex-1 justify-center sm:w-52 sm:flex-none">{{ __('Plan a purchase') }}</a>
+                <a href="#units" class="app-button--ghost min-w-0 flex-1 justify-center sm:w-52 sm:flex-none">{{ __('View units') }}</a>
             </div>
         </section>
 
@@ -72,25 +80,18 @@
         @endphp
 
         @if ($galleryImages !== [] || $hasMap)
-            <section class="mt-9 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
+            <section class="mt-9 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
                 @if ($galleryImages !== [])
-                    <div class="app-card p-6 sm:p-8">
-                        <div class="mb-5">
-                            <p class="mobile-section-title">{{ __('معرض الصور') }}</p>
-                            <h2 class="mt-2 text-2xl font-bold tracking-tight text-white">{{ __('صور المشروع') }}</h2>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                            @foreach ($galleryImages as $img)
-                                <a href="{{ $img }}" target="_blank" class="group relative block aspect-[4/3] overflow-hidden rounded-2xl border border-white/10">
-                                    <img src="{{ $img }}" alt="{{ $project->name }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-110">
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
+                    @include('public.partials.image-gallery', [
+                        'images' => $galleryImages,
+                        'title' => __('صور المشروع'),
+                        'eyebrow' => __('معرض الصور'),
+                        'alt' => $project->name,
+                    ])
                 @endif
 
                 @if ($hasMap)
-                    <div class="app-card space-y-4 p-6 sm:p-8">
+                    <div class="app-card min-w-0 space-y-4 p-6 sm:p-8">
                         <div>
                             <p class="mobile-section-title">{{ __('الموقع على الخريطة') }}</p>
                             <h2 class="mt-1 text-2xl font-bold text-white">{{ __('موقع المشروع على خرائط جوجل') }}</h2>

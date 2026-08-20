@@ -51,6 +51,28 @@ class ProjectUnitFormTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('dashboard.projects.units.edit', [$project, $unit]))
             ->assertOk()
-            ->assertViewIs('dashboard.projects.units.form');
+            ->assertViewIs('dashboard.projects.units.form')
+            ->assertViewHas('buildings', fn ($buildings) => $buildings->contains('id', $building->id));
+    }
+
+    public function test_calculator_only_loads_floors_that_contain_units(): void
+    {
+        $project = Project::factory()->create();
+        $building = Building::factory()->create(['project_id' => $project->id]);
+        $emptyFloor = Floor::factory()->create(['building_id' => $building->id, 'number' => 0]);
+        $occupiedFloor = Floor::factory()->create(['building_id' => $building->id, 'number' => 1]);
+        Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'floor_id' => $occupiedFloor->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get(route('dashboard.installments.index'))
+            ->assertOk()
+            ->assertViewHas('floors', function ($floors) use ($emptyFloor, $occupiedFloor): bool {
+                return $floors->pluck('id')->all() === [$occupiedFloor->id]
+                    && ! $floors->contains('id', $emptyFloor->id);
+            });
     }
 }

@@ -35,6 +35,7 @@ class CustomerRequest extends FormRequest
             'budget_max' => ['nullable', 'numeric', 'min:0'],
             'source' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:4000'],
+            'preferred_locale' => ['nullable', 'in:ar,en'],
             'interested_project_ids' => ['nullable', 'array'],
             'interested_project_ids.*' => ['integer', 'exists:projects,id'],
             'interested_unit_ids' => ['nullable', 'array'],

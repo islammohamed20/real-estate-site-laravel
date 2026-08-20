@@ -8,6 +8,7 @@ use App\Enums\LeadStage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\LeadRequest;
 use App\Models\Crm\CrmActivity;
+use App\Models\Customer;
 use App\Models\Lead;
 use App\Models\LeadAssignmentHistory;
 use App\Models\LeadSource;
@@ -19,6 +20,8 @@ use App\Services\CRM\CustomerConversionService;
 use App\Services\CRM\CustomerLeadSyncService;
 use App\Services\CRM\LeadCreationService;
 use App\Services\Leads\LeadPipelineService;
+use App\Services\PushNotificationService;
+use App\Support\WhatsApp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -125,6 +128,8 @@ class LeadController extends Controller
         $this->syncTags($lead, $request->input('tags', []));
         $this->syncInterestedUnits($lead, $request->input('interested_unit_ids', []));
 
+        app(PushNotificationService::class)->notifyCrmEvent('📋 ليد جديد', $lead->name ?? 'New lead', '/real-statement-control/crm/leads/'.$lead->id);
+
         return redirect()->route('dashboard.crm.leads.show', $lead)
             ->with('status', __('Lead created successfully.'));
     }
@@ -200,7 +205,35 @@ class LeadController extends Controller
             return response()->json(['message' => __('Invalid stage.')], 422);
         }
 
+        $oldStage = $lead->stage->label();
         $service->moveToStage($lead, $stage, auth()->user(), $validated['notes'] ?? null);
+
+        // Push notification: lead stage changed
+        $stageLabels = [
+            'contacted' => 'تم التواصل',
+            'interested' => 'مُهتم',
+            'meeting' => 'اجتماع',
+            'site_visit' => 'زيارة الموقع',
+            'negotiation' => 'تفاوض',
+            'reserved' => 'محجوز',
+            'contract' => 'عقد',
+            'delivered' => 'تم التسليم',
+            'converted' => 'تم التحويل لعميل',
+        ];
+        $stageLabel = $stageLabels[$stage->value] ?? $stage->label();
+        if ($stage->value === 'converted') {
+            app(PushNotificationService::class)->notifyCrmEvent(
+                '🎉 تم تحويل لييد لعميل',
+                ($lead->name ?: $lead->phone) . ' — ' . $stageLabel,
+                '/real-statement-control/crm/leads/' . $lead->id
+            );
+        } elseif (in_array($stage->value, ['reserved', 'contract'])) {
+            app(PushNotificationService::class)->notifyCrmEvent(
+                '📋 تقدم في المبيعات',
+                ($lead->name ?: $lead->phone) . ' — ' . $oldStage . ' → ' . $stageLabel,
+                '/real-statement-control/crm/leads/' . $lead->id
+            );
+        }
 
         return response()->json([
             'message' => __('Stage updated.'),
@@ -230,7 +263,7 @@ class LeadController extends Controller
             return response()->json(['leads' => [], 'customers' => []]);
         }
 
-        $normalized = \App\Support\WhatsApp::number($phone) ?? preg_replace('/[^0-9]/', '', $phone);
+        $normalized = WhatsApp::number($phone) ?? preg_replace('/[^0-9]/', '', $phone);
 
         $leads = Lead::query()
             ->where(function (Builder $q) use ($phone, $normalized): void {
@@ -242,7 +275,7 @@ class LeadController extends Controller
             ->limit(5)
             ->get(['id', 'name', 'phone', 'stage', 'status', 'customer_id', 'created_at']);
 
-        $customers = \App\Models\Customer::query()
+        $customers = Customer::query()
             ->where(function (Builder $q) use ($phone, $normalized): void {
                 $q->where('phone', $phone)->orWhere('phone', $normalized);
             })
@@ -260,7 +293,7 @@ class LeadController extends Controller
                 'created_at' => $lead->created_at?->format('Y-m-d'),
                 'url' => route('dashboard.crm.leads.show', $lead),
             ])->values(),
-            'customers' => $customers->map(fn (\App\Models\Customer $customer) => [
+            'customers' => $customers->map(fn (Customer $customer) => [
                 'id' => $customer->id,
                 'name' => $customer->name,
                 'phone' => $customer->phone,

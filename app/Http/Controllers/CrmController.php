@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeadStage;
 use App\Http\Requests\Crm\ContactRequest;
 use App\Http\Requests\Crm\OrganizationRequest;
 use App\Http\Requests\LeadInquiryRequest;
@@ -12,8 +13,10 @@ use App\Models\Crm\CrmDeal;
 use App\Models\Crm\CrmOrganization;
 use App\Models\Customer;
 use App\Models\Lead;
+use App\Models\LeadSource;
 use App\Models\Note;
 use App\Models\Project;
+use App\Models\Tag;
 use App\Models\Task;
 use App\Models\Unit;
 use App\Models\User;
@@ -98,6 +101,10 @@ class CrmController extends Controller
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
             'units' => Unit::query()->with('project')->orderBy('unit_number')->get()->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]),
             'organizationOptions' => CrmOrganization::query()->orderBy('name')->pluck('name', 'id'),
+            'stages' => collect(LeadStage::cases())->mapWithKeys(fn ($s) => [$s->value => $s->label()]),
+            'priorities' => ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'urgent' => 'Urgent'],
+            'sources' => LeadSource::active()->orderBy('sort_order')->pluck('name', 'id'),
+            'tags' => Tag::active()->orderBy('sort_order')->orderBy('name')->pluck('name', 'id'),
         ]);
     }
 

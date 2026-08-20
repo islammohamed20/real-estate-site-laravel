@@ -21,6 +21,7 @@ class WhatsAppMessage extends Model
         'conversation_id',
         'direction',
         'body',
+        'reactions',
         'message_type',
         'media_name',
         'media_path',
@@ -34,6 +35,7 @@ class WhatsAppMessage extends Model
     {
         return [
             'read_at' => 'datetime',
+            'reactions' => 'array',
         ];
     }
 

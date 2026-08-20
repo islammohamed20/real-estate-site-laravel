@@ -22,9 +22,9 @@
                     <h1 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ $customer->name }}</h1>
                     <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
                         <a href="tel:{{ $customer->phone }}" class="hover:text-white hover:underline">{{ $customer->phone }}</a>
-                        @if ($waCustomerLink = \App\Support\WhatsApp::link($customer->whatsapp, $customer->phone, __('Hello :name, this is the real estate office.', ['name' => $customer->name])))
+                        @if (\App\Support\WhatsApp::number($customer->whatsapp ?? $customer->phone))
                             <span class="text-slate-500">•</span>
-                            <a href="{{ $waCustomerLink }}" target="_blank" class="text-emerald-400 hover:underline">{{ __('WhatsApp') }}</a>
+                            <a href="{{ route('dashboard.whatsapp.index', ['phone' => $customer->whatsapp ?? $customer->phone, 'name' => $customer->name]) }}" class="text-emerald-400 hover:underline">{{ __('WhatsApp') }}</a>
                         @endif
                         @if ($customer->email)
                             <span class="text-slate-500">•</span>
@@ -38,8 +38,8 @@
                         {{ __('Edit') }}
                     </a>
                     <a href="tel:{{ $customer->phone }}" class="app-button text-sm">{{ __('Call') }}</a>
-                    @if ($waCustomerLink = \App\Support\WhatsApp::link($customer->whatsapp, $customer->phone))
-                        <a href="{{ $waCustomerLink }}" target="_blank" class="app-button--ghost text-sm">{{ __('WhatsApp') }}</a>
+                    @if (\App\Support\WhatsApp::number($customer->whatsapp ?? $customer->phone))
+                        <a href="{{ route('dashboard.whatsapp.index', ['phone' => $customer->whatsapp ?? $customer->phone, 'name' => $customer->name]) }}" class="app-button--ghost text-sm">{{ __('WhatsApp') }}</a>
                     @endif
                     <a href="{{ route('dashboard.crm.index') }}" class="app-button--ghost text-sm">{{ __('CRM Home') }}</a>
                     @can('delete', $customer)
@@ -63,7 +63,9 @@
                 'overview' => __('Overview'),
                 'leads' => __('Leads'),
                 'offers' => __('Offers'),
+                'deals' => __('Deals'),
                 'reservations' => __('Reservations'),
+                'plans' => __('Payment plans'),
                 'activities' => __('Activities'),
                 'timeline' => __('Timeline'),
                 'documents' => __('Documents'),
@@ -147,6 +149,32 @@
                     </div>
                 @empty
                     <p class="text-center text-slate-400">{{ __('No offers yet.') }}</p>
+                @endforelse
+            </div>
+
+            <div x-show="tab === 'deals'" x-cloak class="space-y-3">
+                @forelse ($customer->deals as $deal)
+                    <a href="{{ route('dashboard.crm.deals.show', $deal) }}" class="app-card app-card--gradient p-4 block transition hover:border-brand-500/30">
+                        <p class="font-semibold text-white">{{ $deal->title }} <span class="text-slate-400">• {{ 'EGP ' . number_format((float) $deal->value) }}</span></p>
+                        <p class="text-sm text-slate-400">{{ __(ucfirst($deal->status)) }} • {{ $deal->stage?->name }}</p>
+                    </a>
+                @empty
+                    <p class="text-center text-slate-400">{{ __('No deals yet.') }}</p>
+                @endforelse
+            </div>
+
+            <div x-show="tab === 'plans'" x-cloak class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm text-slate-400">{{ __('Saved installment plans for this customer.') }}</p>
+                    <a href="{{ route('dashboard.installments.index') }}" class="app-button text-sm">{{ __('Open calculator') }}</a>
+                </div>
+                @forelse ($customer->plans as $plan)
+                    <a href="{{ route('dashboard.crm.plans.show', $plan) }}" class="app-card app-card--gradient p-4 block transition hover:border-brand-500/30">
+                        <p class="font-semibold text-white">{{ $plan->name ?? ('#'.$plan->id) }} <span class="text-slate-400">• {{ 'EGP ' . number_format((float) $plan->final_price) }}</span></p>
+                        <p class="text-sm text-slate-400">{{ $plan->installment_count }} {{ __('installments') }} • {{ $plan->unit?->unit_number ?: ($plan->project?->name ?? '—') }}</p>
+                    </a>
+                @empty
+                    <p class="text-center text-slate-400">{{ __('No payment plans yet — create one from the calculator and save it to this customer.') }}</p>
                 @endforelse
             </div>
 

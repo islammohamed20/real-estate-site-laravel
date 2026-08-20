@@ -99,6 +99,6 @@ class OfferTest extends TestCase
             ->delete(route('dashboard.crm.offers.destroy', $offer))
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('offers', ['id' => $offer->id]);
+        $this->assertSoftDeleted('offers', ['id' => $offer->id]);
     }
 }

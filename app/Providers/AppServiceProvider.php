@@ -8,6 +8,7 @@ use App\Models\Crm\CrmDeal;
 use App\Models\Reservation;
 use App\Observers\CrmDealObserver;
 use App\Observers\ReservationObserver;
+use Illuminate\Foundation\Support\Providers\EventServiceProvider as BaseEventServiceProvider;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -18,7 +19,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Shared bindings are added through dedicated service providers.
+        // The framework auto-registers the base EventServiceProvider with event
+        // discovery ON, which would register every listener in app/Listeners a
+        // second time (Class@handle) and duplicate queued notifications.
+        BaseEventServiceProvider::disableEventDiscovery();
     }
 
     public function boot(): void

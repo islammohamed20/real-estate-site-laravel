@@ -31,7 +31,44 @@
             </div>
         </section>
 
-        <form id="unit-form" method="POST" action="{{ $unit ? route('dashboard.projects.units.update', [$project, $unit]) : route('dashboard.projects.units.store', $project) }}" enctype="multipart/form-data" class="space-y-6" data-save-shortcut>
+        <form id="unit-form" method="POST" action="{{ $unit ? route('dashboard.projects.units.update', [$project, $unit]) : route('dashboard.projects.units.store', $project) }}" enctype="multipart/form-data" class="space-y-6" data-save-shortcut x-data="{
+            projectPrice: {{ (float) ($project->price_per_meter ?? 0) }},
+            initialBuildingId: '{{ old('building_id', $unit?->building_id ?? request('building_id')) }}',
+            initialFloorId: '{{ old('floor_id', $unit?->floor_id ?? request('floor_id')) }}',
+            buildingId: '',
+            floorId: '',
+            buildings: {{ Js::from($buildings->map(fn ($building) => [
+                'id' => (int) $building->id,
+                'name' => $building->name,
+                'code' => $building->code,
+                'floors' => $building->floors->map(fn ($floor) => [
+                    'id' => (int) $floor->id,
+                    'name' => $floor->name,
+                    'number' => $floor->number,
+                ])->values()->all(),
+            ])->values()->all()) }},
+            get selectedBuilding() {
+                return this.buildings.find(building => Number(building.id) === Number(this.buildingId)) || null;
+            },
+            get filteredFloors() {
+                return this.selectedBuilding ? this.selectedBuilding.floors : [];
+            },
+            onBuildingChange() {
+                if (! this.filteredFloors.some(floor => Number(floor.id) === Number(this.floorId))) {
+                    this.floorId = '';
+                }
+            },
+            init() {
+                const initialBuildingId = this.initialBuildingId;
+                const initialFloorId = this.initialFloorId;
+                this.$nextTick(() => {
+                    this.buildingId = initialBuildingId;
+                    this.$nextTick(() => {
+                        this.floorId = initialFloorId;
+                    });
+                });
+            }
+        }">
             @csrf
             @if($unit) @method('PUT') @endif
 
@@ -47,14 +84,24 @@
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <div class="sm:col-span-2">
+                            <div>
+                                <label for="building_id" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Building') }} <span class="text-rose-400">*</span></label>
+                                <select id="building_id" name="building_id" class="app-select" x-model="buildingId" @change="onBuildingChange()" required>
+                                    <option value="">{{ __('Choose a building') }}</option>
+                                    <template x-for="building in buildings" :key="building.id">
+                                        <option :value="building.id" x-text="building.code ? building.name + ' · ' + building.code : building.name"></option>
+                                    </template>
+                                </select>
+                                @error('building_id') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
                                 <label for="floor_id" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Floor / Level') }} <span class="text-rose-400">*</span></label>
-                                <select id="floor_id" name="floor_id" class="app-select" required>
-                                    @foreach($floors as $floor)
-                                        <option value="{{ $floor->id }}" @selected(old('floor_id', $unit?->floor_id) == $floor->id)>
-                                            {{ $floor->building?->name }} — {{ $floor->name }} (#{{ $floor->number }})
-                                        </option>
-                                    @endforeach
+                                <select id="floor_id" name="floor_id" class="app-select" x-model="floorId" :disabled="! buildingId" required>
+                                    <option value="">{{ __('Choose a floor') }}</option>
+                                    <template x-for="floor in filteredFloors" :key="floor.id">
+                                        <option :value="floor.id" x-text="floor.name + ' (#' + floor.number + ')' "></option>
+                                    </template>
                                 </select>
                                 @error('floor_id') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
                             </div>
@@ -84,15 +131,15 @@
                             <div class="grid grid-cols-3 gap-3 sm:col-span-2">
                                 <div>
                                     <label for="bedrooms" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Bedrooms') }}</label>
-                                    <input type="number" id="bedrooms" name="bedrooms" class="app-input" value="{{ old('bedrooms', $unit?->bedrooms ?? 0) }}" min="0">
+                                    <input type="number" id="bedrooms" name="bedrooms" class="app-input" value="{{ old('bedrooms', $unit?->bedrooms ?? 3) }}" min="0" required>
                                 </div>
                                 <div>
                                     <label for="bathrooms" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Bathrooms') }}</label>
-                                    <input type="number" id="bathrooms" name="bathrooms" class="app-input" value="{{ old('bathrooms', $unit?->bathrooms ?? 0) }}" min="0">
+                                    <input type="number" id="bathrooms" name="bathrooms" class="app-input" value="{{ old('bathrooms', $unit?->bathrooms ?? 2) }}" min="0" required>
                                 </div>
                                 <div>
                                     <label for="terrace_count" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Terrace Count') }}</label>
-                                    <input type="number" id="terrace_count" name="terrace_count" class="app-input" value="{{ old('terrace_count', $unit?->terrace_count ?? 0) }}" min="0">
+                                    <input type="number" id="terrace_count" name="terrace_count" class="app-input" value="{{ old('terrace_count', $unit?->terrace_count ?? 3) }}" min="0">
                                 </div>
                             </div>
                         </div>
@@ -154,11 +201,22 @@
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label for="area" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Primary Area (m²)') }}</label>
-                                <input type="number" step="0.01" id="area" name="area" class="app-input" value="{{ old('area', $unit?->area ?? 0) }}" min="0">
+                                <input type="number" step="0.01" id="area" name="area" class="app-input" value="{{ old('area', $unit?->area ?? 0) }}" min="0" required>
                             </div>
                             <div>
                                 <label for="price_per_meter" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Price per m²') }}</label>
-                                <input type="number" step="0.01" id="price_per_meter" name="price_per_meter" class="app-input" value="{{ old('price_per_meter', $unit?->price_per_meter ?? 0) }}" min="0">
+                                <div class="flex items-center gap-2">
+                                    <input type="number" step="0.01" id="price_per_meter" name="price_per_meter" class="app-input flex-1" value="{{ old('price_per_meter', $unit?->price_per_meter ?? $project->price_per_meter ?? 0) }}" min="0" required>
+                                    @if(!$unit && $project->price_per_meter)
+                                        <button type="button" @click="document.getElementById('price_per_meter').value = projectPrice" class="app-button--ghost shrink-0 px-3 py-2.5 text-xs" title="{{ __('Fill with the project price per m²') }}">{{ __('Project price') }}</button>
+                                    @endif
+                                </div>
+                                @if($project->price_per_meter)
+                                    <p class="mt-1.5 flex items-center gap-1 text-[11px] text-emerald-300/80">
+                                        <svg class="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        {{ __('Filled automatically from the project:') }} {{ number_format((float) $project->price_per_meter) }} {{ __('EGP') }}/m²
+                                    </p>
+                                @endif
                             </div>
 
                             <div class="grid grid-cols-2 gap-4 sm:col-span-2">

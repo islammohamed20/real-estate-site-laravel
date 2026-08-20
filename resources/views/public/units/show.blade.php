@@ -41,7 +41,15 @@
         );
     @endphp
 
-    <div class="animate-fade-up space-y-8 pt-4" x-data="{ activeImage: '{{ $galleryImages[0] }}' }">
+    <div class="animate-fade-up space-y-8 pt-4" x-data="{
+        activeImage: '{{ $galleryImages[0] }}',
+        galleryImages: @js($galleryImages),
+        lightbox: null,
+        openLightbox() { this.lightbox = this.galleryImages.indexOf(this.activeImage); },
+        closeLightbox() { this.lightbox = null; },
+        nextImage() { this.lightbox = (this.lightbox + 1) % this.galleryImages.length; },
+        prevImage() { this.lightbox = (this.lightbox - 1 + this.galleryImages.length) % this.galleryImages.length; },
+    }">
         {{-- Breadcrumb Navigation --}}
         <div class="flex items-center gap-2 text-xs text-slate-400">
             <a href="{{ route('home') }}" class="hover:text-white">{{ __('الرئيسية') }}</a>
@@ -59,11 +67,11 @@
         <section class="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {{-- Main Interactive Image Preview (8 cols) --}}
             <div class="space-y-3 lg:col-span-8">
-                <div class="relative h-[360px] sm:h-[480px] w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl">
+                <div class="group relative h-[360px] sm:h-[480px] w-full cursor-zoom-in overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl" @click="openLightbox()" title="{{ __('تكبير الصورة') }}">
                     <img
                         :src="activeImage"
                         alt="{{ $unit->unit_type }} {{ $unit->unit_number }}"
-                        class="h-full w-full object-cover transition-all duration-500"
+                        class="h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.02]"
                     >
                     <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30"></div>
 
@@ -86,7 +94,7 @@
                     {{-- Bottom Overlay Info --}}
                     <div class="absolute bottom-4 inset-x-4 flex flex-col gap-1 text-white">
                         <span class="text-xs font-medium text-brand-300">{{ $devName }}</span>
-                        <h1 class="text-2xl sm:text-3xl font-extrabold">{{ $unit->unit_type }} فاخرة - {{ __('وحدة') }} {{ $unit->unit_number }}</h1>
+                        <h1 class="text-2xl sm:text-3xl font-extrabold">{{ $unit->unit_type }} - {{ __('وحدة') }} {{ $unit->unit_number }}</h1>
                         <p class="flex items-center gap-1.5 text-xs text-slate-300">
                             <svg class="h-4 w-4 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z" stroke-width="1.8"/>
@@ -95,6 +103,22 @@
                             {{ $locationFull }}
                         </p>
                     </div>
+
+                    {{-- Gallery controls --}}
+                    <div class="absolute bottom-4 start-4 z-10 flex items-center gap-2" @click.stop>
+                        <button type="button" @click="prevImage()" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white backdrop-blur-md transition hover:bg-brand-600/80" aria-label="{{ __('السابق') }}">
+                            <svg class="h-5 w-5 rtl:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <span class="rounded-full border border-white/15 bg-black/35 px-3 py-2 text-xs font-bold text-white tabular-nums backdrop-blur-md"><span x-text="galleryImages.indexOf(activeImage) + 1"></span> / <span x-text="galleryImages.length"></span></span>
+                        <button type="button" @click="nextImage()" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white backdrop-blur-md transition hover:bg-brand-600/80" aria-label="{{ __('التالي') }}">
+                            <svg class="h-5 w-5 rtl:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 18 6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+
+                    {{-- Zoom hint --}}
+                    <span class="absolute bottom-4 end-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md transition group-hover:bg-white/20">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" stroke-width="1.8"/><path d="m21 21-4.3-4.3" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </span>
                 </div>
 
                 {{-- Thumbnails Carousel --}}
@@ -430,4 +454,24 @@
             @endif
         </div>
     </div>
+
+    {{-- Fullscreen image lightbox (teleported to <body> so the fixed overlay
+         always covers the whole viewport, escaping transformed/blurred ancestors) --}}
+    <template x-if="lightbox !== null">
+        <div x-teleport="body" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" @keydown.escape.window="closeLightbox()" @keydown.arrow-right.window="nextImage()" @keydown.arrow-left.window="prevImage()" @click.self="closeLightbox()" role="dialog" aria-modal="true">
+            <button type="button" @click="closeLightbox()" class="absolute end-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20" aria-label="{{ __('إغلاق') }}">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" @click="prevImage()" class="absolute start-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 rtl:rotate-180" aria-label="{{ __('السابق') }}">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m15 18-6-6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <img :src="galleryImages[lightbox]" :alt="'{{ $unit->unit_type }} {{ $unit->unit_number }}'" class="max-h-[85vh] max-w-[88vw] rounded-2xl object-contain shadow-2xl">
+            <button type="button" @click="nextImage()" class="absolute end-3 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 rtl:rotate-180" aria-label="{{ __('التالي') }}">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <p class="absolute bottom-5 start-1/2 -translate-x-1/2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold text-white tabular-nums backdrop-blur">
+                <span x-text="lightbox + 1"></span> / <span x-text="galleryImages.length"></span>
+            </p>
+        </div>
+    </template>
 @endsection

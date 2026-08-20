@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\CrmActivityNotification;
 use App\Services\CRM\CustomerLeadSyncService;
 use App\Services\CRM\CustomerTimelineService;
+use App\Services\PushNotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,6 +86,7 @@ class CustomerController extends Controller
             'offers',
             'reservations',
             'deals',
+            'plans.unit.project',
             'tags',
             'activities.creator',
             'documents',
@@ -129,11 +131,13 @@ class CustomerController extends Controller
 
         $this->syncTags($customer, $request->input('tags', []));
 
-        CrmActivityNotification::notifyManagers(new CrmActivityNotification(
+        CrmActivityNotification::notifyRelevant(new CrmActivityNotification(
             'customer',
             ['name' => $customer->name, 'action_url' => route('dashboard.crm.customers.show', $customer)],
             auth()->user()?->name,
-        ));
+        ), auth()->user());
+
+        app(PushNotificationService::class)->notifyCrmEvent('👤 عميل جديد', $customer->name ?? 'New customer', '/real-statement-control/crm/customers/'.$customer->id);
 
         return redirect()->route('dashboard.crm.customers.show', $customer)
             ->with('status', __('Customer created successfully.'));

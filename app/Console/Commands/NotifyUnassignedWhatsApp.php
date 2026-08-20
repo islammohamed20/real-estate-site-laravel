@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\WhatsAppConversation;
 use App\Models\WhatsAppMessage;
 use App\Notifications\CrmActivityNotification;
+use App\Services\PushNotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -69,9 +70,21 @@ class NotifyUnassignedWhatsApp extends Command
                 'action_url' => route('dashboard.whatsapp.index'),
             ], null);
 
-            CrmActivityNotification::notifyManagers($notification);
-            $notified++;
+            // Only notify global users (Administrators/Owners) — Sales Managers
+            // cannot see unassigned conversations, so notifying them is noise.
+            CrmActivityNotification::notifyRelevant($notification, null, false);
+
+            // Push notification to administrators/owners (sales managers cannot see unassigned conversations)
             $displayName = $conversation->customer_name ?: $conversation->customer_phone;
+            app(PushNotificationService::class)->sendToRoles(
+                ['Administrator', 'Owner'],
+                '💬 واتساب غير مُسنَّد',
+                "{$displayName} — ينتظر منذ {$hoursWaiting} ساعة",
+                '/real-statement-control/whatsapp?conversation=' . $conversation->id,
+                ['tag' => 'whatsapp-unassigned-' . $conversation->id]
+            );
+
+            $notified++;
             $this->line("Notified managers about conversation #{$conversation->id} ({$displayName}) — {$hoursWaiting}h waiting.");
         }
 

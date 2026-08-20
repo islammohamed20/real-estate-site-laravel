@@ -296,6 +296,20 @@
     @apply flex min-h-12 items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-200 transition-all duration-300 hover:bg-white/5;
   }
 
+  .mobile-drawer__link-content {
+    @apply inline-flex min-w-0 items-center gap-3;
+  }
+
+  .mobile-drawer__link-content > svg,
+  .mobile-drawer__icon svg {
+    @apply h-5 w-5 shrink-0 text-slate-400;
+  }
+
+  .mobile-drawer__link.is-active .mobile-drawer__link-content > svg,
+  .mobile-drawer__link.is-active .mobile-drawer__icon svg {
+    @apply text-brand-300;
+  }
+
   .mobile-drawer__link.is-active {
     @apply bg-brand-600/10 text-brand-300 border-brand-500 ltr:border-l-2 rtl:border-r-2 ltr:pl-3.5 rtl:pr-3.5;
   }

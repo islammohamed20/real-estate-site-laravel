@@ -48,6 +48,8 @@ class LeadRequest extends FormRequest
             'preferred_payment_plan' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'in:low,normal,high,urgent'],
             'notes' => ['nullable', 'string', 'max:4000'],
+            'preferred_locale' => ['nullable', 'in:ar,en'],
+            'message' => ['nullable', 'string', 'max:4000'],
             'last_contacted_at' => ['nullable', 'date'],
             'follow_up_at' => ['nullable', 'date'],
             'converted_at' => ['nullable', 'date'],

@@ -17,6 +17,9 @@ class DatabaseSeeder extends Seeder
             CompanyProfileSeeder::class,
             InstallmentTemplateSeeder::class,
             CrmSeeder::class,
+            WhatsAppMessageTemplateSeeder::class,
+            HomeSectionSeeder::class,
+            EmailTemplateSeeder::class,
         ]);
     }
 }

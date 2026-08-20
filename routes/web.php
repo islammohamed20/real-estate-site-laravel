@@ -2,15 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\HomeSectionController;
+use App\Http\Controllers\Admin\AutomationController;
+use App\Http\Controllers\Admin\MaintenanceController;
+use App\Http\Controllers\Admin\EmailTemplateController;
+use App\Http\Controllers\Admin\SalesEvaluationController;
+use App\Http\Controllers\Admin\SalesPerformanceController;
+use App\Http\Controllers\Admin\SalesTargetController;
+use App\Http\Controllers\Admin\SalesTeamController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\Crm\ActivityController;
 use App\Http\Controllers\Crm\CrmTrashController;
 use App\Http\Controllers\Crm\CustomerController;
+use App\Http\Controllers\Crm\DataTransferController;
 use App\Http\Controllers\Crm\DealController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\Crm\DocumentController;
@@ -33,6 +43,7 @@ use App\Http\Controllers\ProjectManagementController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use App\Models\CompanyProfile;
@@ -90,6 +101,18 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/real-statement-control/login', [LoginController::class, 'store'])
         ->middleware('throttle:5,1')
         ->name('login.store');
+
+    // Password reset for dashboard users.
+    Route::get('/real-statement-control/forgot-password', [PasswordResetController::class, 'showForgot'])
+        ->name('password.request');
+    Route::post('/real-statement-control/forgot-password', [PasswordResetController::class, 'sendResetLink'])
+        ->middleware('throttle:5,1')
+        ->name('password.email');
+    Route::get('/real-statement-control/reset-password/{token}', [PasswordResetController::class, 'showReset'])
+        ->name('password.reset');
+    Route::post('/real-statement-control/reset-password', [PasswordResetController::class, 'reset'])
+        ->middleware('throttle:5,1')
+        ->name('password.store');
 });
 
 Route::post('/real-statement-control/logout', [LoginController::class, 'destroy'])
@@ -111,6 +134,15 @@ Route::middleware('guest:customer')->group(function (): void {
         ->name('customer.login.store');
     Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
     Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.store');
+
+    // Email verification (OTP) — required for newly registered portal accounts.
+    Route::get('/verify-email', [CustomerAuthController::class, 'showVerifyEmail'])->name('customer.verify.show');
+    Route::post('/verify-email', [CustomerAuthController::class, 'verifyEmail'])
+        ->middleware('throttle:10,10')
+        ->name('customer.verify.store');
+    Route::post('/verify-email/resend', [CustomerAuthController::class, 'resendOtp'])
+        ->middleware('throttle:3,1')
+        ->name('customer.verify.resend');
 });
 
 Route::post('/logout', [CustomerAuthController::class, 'logout'])
@@ -119,6 +151,28 @@ Route::post('/logout', [CustomerAuthController::class, 'logout'])
 
 Route::middleware('customer.auth')->prefix('account')->name('customer.')->group(function (): void {
     Route::get('/', [CustomerAccountController::class, 'index'])->name('account');
+    Route::put('/profile', [CustomerAccountController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/password', [CustomerAccountController::class, 'updatePassword'])->name('password.update');
+    Route::post('/password/verify', [CustomerAccountController::class, 'verifyPasswordChange'])
+        ->middleware('throttle:5,1')
+        ->name('password.verify');
+    Route::post('/2fa/whatsapp/request', [CustomerAccountController::class, 'requestWhatsappTwoFactor'])
+        ->middleware('throttle:3,1')
+        ->name('2fa.whatsapp.request');
+    Route::post('/2fa/whatsapp/enable', [CustomerAccountController::class, 'enableWhatsappTwoFactor'])
+        ->middleware('throttle:5,1')
+        ->name('2fa.whatsapp.enable');
+    Route::post('/2fa/whatsapp/disable', [CustomerAccountController::class, 'disableWhatsappTwoFactor'])->name('2fa.whatsapp.disable');
+    Route::get('/2fa/authenticator', [CustomerAccountController::class, 'showAuthenticatorSetup'])->name('2fa.authenticator');
+    Route::post('/2fa/authenticator', [CustomerAccountController::class, 'enableAuthenticator'])
+        ->middleware('throttle:5,1')
+        ->name('2fa.authenticator.enable');
+    Route::post('/2fa/authenticator/disable', [CustomerAccountController::class, 'disableAuthenticator'])
+        ->middleware('throttle:5,1')
+        ->name('2fa.authenticator.disable');
+    Route::get('/documents/{document}/download', [CustomerAccountController::class, 'downloadDocument'])
+        ->whereNumber('document')
+        ->name('documents.download');
 });
 
 // Legacy dashboard path → new control panel path
@@ -133,7 +187,7 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         ->name('trash-cleanup.run');
 
     Route::get('/', [DashboardController::class, 'index'])
-        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Accountant|Receptionist|Owner')
+        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Accountant|Receptionist|Data Entry|Owner')
         ->name('home');
 
     Route::get('/calculator', [InstallmentCalculatorController::class, 'index'])
@@ -167,6 +221,13 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     Route::post('/crm/leads', [CrmController::class, 'storeLead'])
         ->middleware('role:Administrator|Sales Manager|Sales Executive|Marketing Manager|Receptionist|Owner')
         ->name('crm.leads.quick-store');
+
+    Route::prefix('crm/data-transfer')->name('crm.data-transfer.')->middleware('permission:view crm dashboard|view all leads|view all customers|view own leads|view own customers|manage crm')->group(function (): void {
+        Route::get('/', [DataTransferController::class, 'index'])->name('index');
+        Route::get('/template', [DataTransferController::class, 'template'])->name('template');
+        Route::get('/export', [DataTransferController::class, 'export'])->name('export');
+        Route::post('/import', [DataTransferController::class, 'import'])->name('import')->middleware('permission:create leads|create customers|manage crm');
+    });
 
     Route::prefix('crm/leads')->name('crm.leads.')->middleware('permission:view crm dashboard|view all leads|view team leads|view own leads|manage crm')->group(function (): void {
         Route::get('/', [LeadController::class, 'index'])->name('index');
@@ -263,6 +324,9 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::get('/{plan}', [InstallmentPlanController::class, 'show'])->name('show');
         Route::get('/{plan}/pdf', [InstallmentPlanController::class, 'pdf'])->name('pdf');
         Route::patch('/{plan}/items/{item}', [InstallmentPlanController::class, 'updateItem'])->name('items.update')->middleware('permission:manage crm');
+        Route::post('/{plan}/items/{item}/full-pay', [InstallmentPlanController::class, 'fullPay'])->name('items.full-pay')->middleware('permission:manage crm');
+        Route::get('/{plan}/items/{item}/receipt', [InstallmentPlanController::class, 'receipt'])->name('items.receipt');
+        Route::post('/{plan}/full-pay-all', [InstallmentPlanController::class, 'fullPayAll'])->name('full-pay-all')->middleware('permission:manage crm');
         Route::delete('/{plan}', [InstallmentPlanController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm');
     });
 
@@ -289,23 +353,23 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::delete('/{reservation}', [ReservationController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm|create reservations');
     });
 
-    Route::prefix('crm/deals')->name('crm.deals.')->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer')->group(function (): void {
+    Route::prefix('crm/deals')->name('crm.deals.')->middleware('permission:view crm dashboard|view all deals|view team deals|view own deals|manage crm')->group(function (): void {
         Route::get('/', [DealController::class, 'index'])->name('index');
-        Route::post('/', [DealController::class, 'store'])->name('store')->middleware('role:Administrator|Sales Manager|Sales Executive');
+        Route::post('/', [DealController::class, 'store'])->name('store')->middleware('permission:create deals|manage crm');
         Route::get('/{deal}', [DealController::class, 'show'])->name('show');
-        Route::put('/{deal}', [DealController::class, 'update'])->name('update')->middleware('role:Administrator|Sales Manager|Sales Executive');
-        Route::patch('/{deal}/stage', [DealController::class, 'moveStage'])->name('stage.update')->middleware('role:Administrator|Sales Manager|Sales Executive');
-        Route::post('/{deal}/activities', [DealController::class, 'storeActivity'])->name('activities.store')->middleware('role:Administrator|Sales Manager|Sales Executive');
-        Route::put('/{deal}/activities/{activity}', [DealController::class, 'updateActivity'])->name('activities.update')->middleware('role:Administrator|Sales Manager|Sales Executive');
-        Route::delete('/{deal}/activities/{activity}', [DealController::class, 'destroyActivity'])->name('activities.destroy')->middleware('role:Administrator|Sales Manager|Sales Executive');
-        Route::delete('/{deal}', [DealController::class, 'destroy'])->name('destroy')->middleware('role:Administrator|Sales Manager|Sales Executive');
+        Route::put('/{deal}', [DealController::class, 'update'])->name('update')->middleware('permission:edit all deals|edit own deals|manage crm');
+        Route::patch('/{deal}/stage', [DealController::class, 'moveStage'])->name('stage.update')->middleware('permission:move deal stage|manage crm');
+        Route::post('/{deal}/activities', [DealController::class, 'storeActivity'])->name('activities.store')->middleware('permission:manage crm|edit all deals|edit own deals');
+        Route::put('/{deal}/activities/{activity}', [DealController::class, 'updateActivity'])->name('activities.update')->middleware('permission:manage crm|edit all deals|edit own deals');
+        Route::delete('/{deal}/activities/{activity}', [DealController::class, 'destroyActivity'])->name('activities.destroy')->middleware('permission:manage crm|edit all deals|edit own deals');
+        Route::delete('/{deal}', [DealController::class, 'destroy'])->name('destroy')->middleware('permission:delete deals|manage crm');
     });
 
     Route::get('/projects', [ProjectManagementController::class, 'index'])
-        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Owner')
+        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Data Entry|Owner')
         ->name('projects.index');
 
-    Route::middleware('role:Administrator|Sales Manager|Sales Executive')->group(function (): void {
+    Route::middleware('role:Administrator|Sales Executive|Data Entry')->group(function (): void {
         Route::get('/projects/create', [ProjectManagementController::class, 'create'])->name('projects.create');
         Route::post('/projects', [ProjectManagementController::class, 'store'])->name('projects.store');
         Route::get('/projects/{project}/edit', [ProjectManagementController::class, 'edit'])->name('projects.edit');
@@ -319,7 +383,7 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::delete('/projects/{project}/units/{unit}', [ProjectManagementController::class, 'destroyUnit'])->name('projects.units.destroy');
     });
 
-    Route::prefix('trash')->name('trash.')->middleware('role:Administrator|Sales Manager')->group(function (): void {
+    Route::prefix('trash')->name('trash.')->middleware('role:Administrator|Sales Manager|Data Entry')->group(function (): void {
         Route::get('/', [DashboardTrashController::class, 'index'])->name('index');
         Route::post('/projects/{project}/restore', [ProjectManagementController::class, 'restoreProject'])->name('projects.restore')->withTrashed();
         Route::delete('/projects/{project}/force-delete', [ProjectManagementController::class, 'forceDeleteProject'])->name('projects.force-delete')->withTrashed();
@@ -345,6 +409,23 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         ->middleware('permission:view reports')
         ->name('analytics.index');
 
+    Route::get('/sales-performance', [SalesPerformanceController::class, 'index'])
+        ->middleware('permission:view reports')
+        ->name('sales-performance.index');
+
+    Route::get('/sales-evaluations', [SalesEvaluationController::class, 'index'])
+        ->middleware('permission:view reports')
+        ->name('sales-evaluations.index');
+
+    Route::prefix('sales-targets')->name('sales-targets.')->middleware('permission:manage teams')->group(function (): void {
+        Route::get('/', [SalesTargetController::class, 'index'])->name('index');
+        Route::get('/create', [SalesTargetController::class, 'create'])->name('create');
+        Route::post('/', [SalesTargetController::class, 'store'])->name('store');
+        Route::get('/{target}/edit', [SalesTargetController::class, 'edit'])->name('edit');
+        Route::put('/{target}', [SalesTargetController::class, 'update'])->name('update');
+        Route::delete('/{target}', [SalesTargetController::class, 'destroy'])->name('destroy');
+    });
+
     Route::prefix('banners')->name('banners.')->middleware('permission:manage settings')->group(function (): void {
         Route::get('/', [BannerController::class, 'index'])->name('index');
         Route::get('/create', [BannerController::class, 'create'])->name('create');
@@ -362,9 +443,68 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         ->middleware('permission:manage settings')
         ->name('settings.update');
 
+    // Personal notification preferences (any signed-in dashboard user).
+
+    // Live Status polling (smart auto-refresh)
+    Route::get("live-status/poll", [App\Http\Controllers\Dashboard\LiveStatusController::class, "poll"]);
+    Route::get("live-status/ping", [App\Http\Controllers\Dashboard\LiveStatusController::class, "ping"]);
+
+
+    // Push Notifications
+    Route::post('/push/subscribe', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'store'])->name('push.subscribe');
+    Route::post('/push/unsubscribe', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'destroy'])->name('push.unsubscribe');
+    Route::get('/push/vapid-key', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'publicKey'])->name('push.vapid-key');
+    Route::put('/settings/notifications', [SettingsController::class, 'updateNotificationPreferences'])
+        ->name('settings.notifications.update');
+
+    Route::get('/settings/automation', [AutomationController::class, 'index'])
+        ->middleware('permission:manage settings')
+        ->name('automation.index');
+
+    Route::put('/settings/automation', [AutomationController::class, 'update'])
+        ->middleware('permission:manage settings')
+        ->name('automation.update');
+
+    Route::prefix('email-templates')->name('email-templates.')->middleware('permission:manage settings')->group(function (): void {
+        Route::get('/', [EmailTemplateController::class, 'index'])->name('index');
+        Route::get('/create', [EmailTemplateController::class, 'create'])->name('create');
+        Route::post('/', [EmailTemplateController::class, 'store'])->name('store');
+        Route::get('/{template}/edit', [EmailTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{template}', [EmailTemplateController::class, 'update'])->name('update');
+        Route::post('/{template}/toggle', [EmailTemplateController::class, 'toggle'])->name('toggle');
+        Route::get('/{template}/preview', [EmailTemplateController::class, 'preview'])->name('preview');
+        Route::post('/{template}/test', [EmailTemplateController::class, 'sendTest'])->name('test');
+        Route::delete('/{template}', [EmailTemplateController::class, 'destroy'])->name('destroy');
+    });
+
+    // ===== Maintenance & Backups =====
+    Route::prefix('maintenance')->name('maintenance.')->middleware('permission:manage settings')->group(function (): void {
+        Route::get('/', [MaintenanceController::class, 'index'])->name('index');
+        Route::post('/backup', [MaintenanceController::class, 'createBackup'])->name('backup.create');
+        Route::get('/backups/{file}/download', [MaintenanceController::class, 'download'])->name('backup.download')->where('file', '.*');
+        Route::delete('/backups/{file}', [MaintenanceController::class, 'destroy'])->name('backup.destroy')->where('file', '.*');
+        Route::post('/backups/{file}/restore', [MaintenanceController::class, 'restore'])->name('backup.restore')->where('file', '.*');
+        Route::post('/cache', [MaintenanceController::class, 'clearCache'])->name('cache.clear');
+        Route::put('/scheduled-jobs', [MaintenanceController::class, 'updateScheduledJobs'])->name('scheduled-jobs.update');
+    });
+
+    Route::prefix('home-sections')->name('home-sections.')->middleware('permission:manage settings')->group(function (): void {
+        Route::get('/', [HomeSectionController::class, 'index'])->name('index');
+        Route::get('/{section}/edit', [HomeSectionController::class, 'edit'])->name('edit');
+        Route::put('/{section}', [HomeSectionController::class, 'update'])->name('update');
+        Route::post('/{section}/toggle', [HomeSectionController::class, 'toggle'])->name('toggle');
+        Route::post('/{section}/move-up', [HomeSectionController::class, 'moveUp'])->name('move-up');
+        Route::post('/{section}/move-down', [HomeSectionController::class, 'moveDown'])->name('move-down');
+    });
+
     // ===== Two-Factor Authentication management =====
     Route::get('/security', [TwoFactorController::class, 'showSecurityPage'])
         ->name('security');
+
+    Route::get('/profile', [UserProfileController::class, 'index'])
+        ->name('profile.index');
+    Route::put('/profile', [UserProfileController::class, 'update'])
+        ->name('profile.update');
 
     Route::get('/settings/2fa/enable', [TwoFactorController::class, 'showEnableForm'])
         ->name('2fa.enable');
@@ -411,6 +551,17 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         ->middleware('permission:manage users')
         ->name('users.permissions');
 
+    // ===== Sales Teams =====
+    Route::prefix('sales-teams')->name('sales-teams.')->middleware('permission:manage teams')->group(function (): void {
+        Route::get('/', [SalesTeamController::class, 'index'])->name('index');
+        Route::get('/create', [SalesTeamController::class, 'create'])->name('create');
+        Route::post('/', [SalesTeamController::class, 'store'])->name('store');
+        Route::get('/{team}/edit', [SalesTeamController::class, 'edit'])->name('edit');
+        Route::put('/{team}', [SalesTeamController::class, 'update'])->name('update');
+        Route::post('/{team}/toggle', [SalesTeamController::class, 'toggle'])->name('toggle');
+        Route::delete('/{team}', [SalesTeamController::class, 'destroy'])->name('destroy');
+    });
+
     // ===== WhatsApp chat panel =====
     Route::prefix('whatsapp')->name('whatsapp.')->middleware('permission:view whatsapp|view all whatsapp conversations|manage crm')->group(function (): void {
         Route::get('/', [WhatsAppController::class, 'index'])->name('index');
@@ -424,6 +575,8 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::post('/conversations/{conversation}/assign', [WhatsAppController::class, 'assign'])->name('assign');
         Route::post('/conversations/{conversation}/claim', [WhatsAppController::class, 'claim'])->name('claim');
         Route::post('/conversations/{conversation}/status', [WhatsAppController::class, 'status'])->name('status');
+        Route::post('/conversations/{conversation}/rename', [WhatsAppController::class, 'renameConversation'])->name('rename');
+        Route::delete('/conversations/{conversation}', [WhatsAppController::class, 'destroyConversation'])->name('destroy');
         Route::post('/conversations/{conversation}/link', [WhatsAppController::class, 'link'])->name('link');
         Route::post('/conversations/{conversation}/lead', [WhatsAppController::class, 'createLead'])->name('lead');
         Route::post('/start', [WhatsAppController::class, 'start'])->name('start');
@@ -433,6 +586,11 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::delete('/templates/{template}', [WhatsAppController::class, 'destroyTemplate'])->name('templates.destroy');
     });
 });
+
+// Facebook Messenger webhook
+Route::get('/webhook/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'verify'])->name('webhook.facebook.verify');
+Route::post('/webhook/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'handle'])->name('webhook.facebook.handle')
+    ->middleware('throttle:120,1');
 
 // Evolution API WhatsApp webhook (incoming messages)
 Route::post('/webhook/whatsapp/evolution', [WhatsAppWebhookController::class, 'handle'])

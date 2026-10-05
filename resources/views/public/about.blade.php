@@ -23,7 +23,7 @@
         {{-- Stats --}}
         <section class="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div class="app-card app-card--gradient space-y-1 p-5 text-center">
-                <p class="text-3xl font-extrabold text-brand-400">+15</p>
+                <p class="text-3xl font-extrabold text-brand-400">+20</p>
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ __('Years of experience') }}</p>
             </div>
             <div class="app-card app-card--gradient space-y-1 p-5 text-center">
@@ -35,7 +35,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ __('Units') }}</p>
             </div>
             <div class="app-card app-card--gradient space-y-1 p-5 text-center">
-                <p class="text-3xl font-extrabold text-amber-400">8</p>
+                <p class="text-3xl font-extrabold text-amber-400">5</p>
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ __('Years installment') }}</p>
             </div>
         </section>
@@ -44,7 +44,7 @@
         <section class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ([
                 ['title' => __('Architectural excellence'), 'body' => __('Modern Italian design with optimal space and natural light.')],
-                ['title' => __('Flexible payments'), 'body' => __('Up to 8 years installment with no-interest options tailored to buyers.')],
+                ['title' => __('Flexible payments'), 'body' => __('Up to 5 years installment with no-interest options tailored to buyers.')],
                 ['title' => __('Prime locations'), 'body' => __('Projects in the most vibrant and connected areas.')],
                 ['title' => __('Transparent pricing'), 'body' => __('Clear unit pricing, maintenance fees, and payment schedules.')],
                 ['title' => __('After-sales support'), 'body' => __('A dedicated team for contracts, installments, and unit delivery.')],

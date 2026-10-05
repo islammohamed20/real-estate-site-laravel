@@ -38,7 +38,7 @@ class LeadPolicy extends BasePolicy
         }
 
         if ($user->hasPermissionTo('view team leads')) {
-            return $model->assigned_sales_id === $user->id;
+            return in_array($model->assigned_sales_id, $this->teamUserIds($user), true);
         }
 
         return $user->hasPermissionTo('view own leads')
@@ -80,5 +80,19 @@ class LeadPolicy extends BasePolicy
     public function assign(User $user): bool
     {
         return $user->is_active && $user->hasAnyPermission(['assign leads', 'manage crm']);
+    }
+
+    private function teamUserIds(User $user): array
+    {
+        return $user->salesTeams()
+            ->where('sales_teams.is_active', true)
+            ->with('members:id')
+            ->get()
+            ->flatMap(fn ($team) => $team->members->pluck('id'))
+            ->merge($user->managedTeams()->where('is_active', true)->with('members:id')->get()->flatMap(fn ($team) => $team->members->pluck('id')))
+            ->push($user->id)
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

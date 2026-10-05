@@ -18,7 +18,7 @@ class SalesTeamController extends Controller
     public function index(): View
     {
         $teams = SalesTeam::query()
-            ->with(['manager', 'members'])
+            ->with(['manager', 'members.roles'])
             ->when(! SalesTeamAccess::isGlobal(), fn ($query) => $query->where('manager_id', auth()->id()))
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -172,8 +172,7 @@ class SalesTeamController extends Controller
     }
 
     /**
-     * Attach a single-query `active_leads_count` attribute to every team
-     * (leads currently assigned to any of its members).
+     * Attach lead and customer counts assigned to Sales Executives in each team.
      */
     private function attachLeadCounts($teams): void
     {
@@ -182,19 +181,32 @@ class SalesTeamController extends Controller
             ->unique()
             ->values();
 
-        $counts = [];
-        if ($memberIds->isNotEmpty()) {
-            $counts = Lead::query()
+        $leadCounts = $memberIds->isNotEmpty()
+            ? Lead::query()
                 ->whereIn('assigned_sales_id', $memberIds)
                 ->selectRaw('assigned_sales_id, COUNT(*) as total')
                 ->groupBy('assigned_sales_id')
                 ->pluck('total', 'assigned_sales_id')
-                ->all();
-        }
+                ->all()
+            : [];
 
-        $teams->getCollection()->each(function (SalesTeam $team) use ($counts): void {
-            $team->active_leads_count = collect($team->members)
-                ->sum(fn (User $member) => (int) ($counts[$member->id] ?? 0));
+        $teams->getCollection()->each(function (SalesTeam $team) use ($leadCounts): void {
+            $executiveIds = collect($team->members)
+                ->filter(fn (User $member): bool => $member->hasRole('Sales Executive'))
+                ->pluck('id')
+                ->values();
+
+            $team->active_leads_count = $executiveIds->sum(
+                fn ($userId): int => (int) ($leadCounts[$userId] ?? 0),
+            );
+            $team->assigned_customers_count = $executiveIds->isNotEmpty()
+                ? \App\Models\Customer::query()
+                    ->where(function ($query) use ($executiveIds): void {
+                        $query->whereHas('salesUsers', fn ($salesUser) => $salesUser->whereIn('users.id', $executiveIds))
+                            ->orWhereHas('leads', fn ($lead) => $lead->whereIn('assigned_sales_id', $executiveIds));
+                    })
+                    ->count()
+                : 0;
         });
     }
 }

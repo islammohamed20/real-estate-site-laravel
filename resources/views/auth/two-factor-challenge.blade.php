@@ -19,7 +19,15 @@
                     </svg>
                 </span>
                 <h1 class="stagger-item mt-4 text-2xl font-bold tracking-tight text-white" style="animation-delay:120ms">{{ __('Two-Factor Authentication') }}</h1>
-                <p class="stagger-item mt-2 text-sm text-slate-400" style="animation-delay:200ms">{{ __('Enter the 6-digit code from your authenticator app, or a one-time recovery code.') }}</p>
+                <p class="stagger-item mt-2 text-sm text-slate-400" style="animation-delay:200ms">
+                    @if ($showTotp && $showPasskey)
+                        {{ __('Verify with your authenticator app or use a registered passkey.') }}
+                    @elseif ($showPasskey)
+                        {{ __('Verify with a registered passkey to continue.') }}
+                    @else
+                        {{ __('Enter the 6-digit code from your authenticator app, or a one-time recovery code.') }}
+                    @endif
+                </p>
             </div>
 
             @if (session('status'))
@@ -28,38 +36,54 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('2fa.verify.store') }}" class="space-y-4">
-                @csrf
+            @if ($showTotp)
+                <form method="POST" action="{{ route('2fa.verify.store') }}" class="space-y-4">
+                    @csrf
 
-                <label class="stagger-item block space-y-2" style="animation-delay:280ms">
-                    <span class="text-sm font-medium text-slate-300">{{ __('Authentication code') }}</span>
-                    <input
-                        type="text"
-                        name="code"
-                        required
-                        autofocus
-                        autocomplete="one-time-code"
-                        inputmode="numeric"
-                        pattern="[0-9a-zA-Z]*"
-                        maxlength="32"
-                        dir="ltr"
-                        class="app-input text-center text-lg font-mono tracking-[0.4em] transition-all duration-300 focus:scale-[1.01]"
-                        placeholder="••••••"
-                    >
-                    @error('code')
-                        <span class="block text-sm text-rose-400">{{ $message }}</span>
-                    @enderror
-                </label>
+                    <label class="stagger-item block space-y-2" style="animation-delay:280ms">
+                        <span class="text-sm font-medium text-slate-300">{{ __('Authentication code') }}</span>
+                        <input
+                            type="text"
+                            name="code"
+                            required
+                            autofocus
+                            autocomplete="one-time-code"
+                            inputmode="numeric"
+                            pattern="[0-9a-zA-Z]*"
+                            maxlength="32"
+                            dir="ltr"
+                            class="app-input text-center text-lg font-mono tracking-[0.4em] transition-all duration-300 focus:scale-[1.01]"
+                            placeholder="••••••"
+                        >
+                        @error('code')
+                            <span class="block text-sm text-rose-400">{{ $message }}</span>
+                        @enderror
+                    </label>
 
-                <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:360ms">
-                    {{ __('Verify & Continue') }}
+                    <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:360ms">
+                        {{ __('Verify & Continue') }}
+                    </button>
+                </form>
+
+                <div class="stagger-item rounded-2xl border border-white/10 bg-white/5 p-4 text-center" style="animation-delay:440ms">
+                    <p class="text-xs text-slate-400">{{ __('Lost your authenticator app?') }}</p>
+                    <p class="mt-1 text-xs text-slate-400">{{ __('Use one of your one-time recovery codes instead.') }}</p>
+                </div>
+            @endif
+
+            @if ($showTotp && $showPasskey)
+                <div class="relative flex items-center py-2">
+                    <div class="grow border-t border-white/10"></div>
+                    <span class="mx-3 text-xs text-slate-500">{{ __('or') }}</span>
+                    <div class="grow border-t border-white/10"></div>
+                </div>
+            @endif
+
+            @if ($showPasskey)
+                <button type="button" id="passkey-2fa" class="stagger-item hidden w-full app-button--ghost transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:480ms" data-options="{{ route('2fa.passkey.options') }}" data-submit="{{ route('2fa.passkey.verify') }}">
+                    {{ __('Verify with passkey') }}
                 </button>
-            </form>
-
-            <div class="stagger-item rounded-2xl border border-white/10 bg-white/5 p-4 text-center" style="animation-delay:440ms">
-                <p class="text-xs text-slate-400">{{ __('Lost your authenticator app?') }}</p>
-                <p class="mt-1 text-xs text-slate-400">{{ __('Use one of your one-time recovery codes instead.') }}</p>
-            </div>
+            @endif
         </div>
 
         <p class="stagger-item mt-6 text-center text-sm text-slate-500" style="animation-delay:520ms">

@@ -23,6 +23,7 @@ class Project extends Model
         'slug',
         'code',
         'price_per_meter',
+        'max_installment_years',
         'description',
         'images',
         'cover_image_path',
@@ -32,6 +33,7 @@ class Project extends Model
         'map_lat',
         'map_lng',
         'status',
+        'current_phase',
         'featured',
         'sort_order',
         'published_at',
@@ -44,6 +46,7 @@ class Project extends Model
             'map_lat' => 'decimal:7',
             'map_lng' => 'decimal:7',
             'price_per_meter' => 'decimal:2',
+            'max_installment_years' => 'integer',
             'featured' => 'boolean',
             'published_at' => 'datetime',
         ];

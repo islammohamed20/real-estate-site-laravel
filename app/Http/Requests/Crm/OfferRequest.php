@@ -38,4 +38,20 @@ class OfferRequest extends FormRequest
             'stamp_text' => ['nullable', 'string', 'max:255'],
         ];
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $customerId = $this->input('customer_id');
+            $leadId = $this->input('lead_id');
+
+            if ($customerId && $leadId) {
+                $validator->errors()->add('customer_id', __('You can only choose either a customer or a lead, not both.'));
+            }
+
+            if (! $customerId && ! $leadId) {
+                $validator->errors()->add('customer_id', __('Please choose a customer or a lead.'));
+            }
+        });
+    }
 }

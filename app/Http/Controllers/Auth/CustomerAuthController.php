@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Enums\LeadStage;
 use App\Mail\CustomerOtpMail;
 use App\Models\Customer;
+use App\Models\Lead;
+use App\Models\LeadSource;
 use App\Models\OtpLog;
+use App\Rules\Turnstile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
@@ -28,6 +33,11 @@ class CustomerAuthController extends Controller
         $data = $request->validate([
             'login' => ['required', 'string'],
             'password' => ['required', 'string'],
+            'turnstile' => Rule::when(
+                config('services.turnstile.enabled') && config('services.turnstile.secret_key'),
+                ['required', 'string', new Turnstile],
+                []
+            ),
         ]);
 
         // A customer may sign in with either their email or their phone number.
@@ -65,8 +75,7 @@ class CustomerAuthController extends Controller
         }
 
         Auth::guard('customer')->login($customer, $request->boolean('remember'));
-
-        $request->session()->regenerate();
+        $this->establishCustomerSession($request, $customer);
 
         $redirectUrl = $request->input('redirect') ?? route('customer.account');
 
@@ -86,6 +95,11 @@ class CustomerAuthController extends Controller
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'confirmed', Password::min(8)],
+            'turnstile' => Rule::when(
+                config('services.turnstile.enabled') && config('services.turnstile.secret_key'),
+                ['required', 'string', new Turnstile],
+                []
+            ),
         ]);
 
         // Match an existing CRM record first (by phone, then by email) so a
@@ -93,6 +107,7 @@ class CustomerAuthController extends Controller
         // unique constraint — they just get a portal password.
         $customer = Customer::query()->where('phone', $data['phone'])->first()
             ?? Customer::query()->where('email', $data['email'])->first();
+        $createdPortalAccount = false;
 
         if ($customer !== null) {
             if (! empty($customer->password)) {
@@ -115,15 +130,36 @@ class CustomerAuthController extends Controller
                 'phone' => $data['phone'],
                 'email' => $data['email'],
                 'password' => $data['password'],
-                'source' => 'portal',
+                'source' => 'Portal',
+            ]);
+            $createdPortalAccount = true;
+        }
+
+        if ($createdPortalAccount) {
+            $portalSource = LeadSource::query()->firstOrCreate(
+                ['name' => 'Portal'],
+                ['color' => '#64748b', 'sort_order' => 0, 'is_active' => true]
+            );
+
+            Lead::query()->create([
+                'customer_id' => $customer->id,
+                'lead_source_id' => $portalSource->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'whatsapp' => $customer->whatsapp ?? $customer->phone,
+                'email' => $customer->email,
+                'occupation' => $customer->occupation,
+                'stage' => LeadStage::New,
+                'status' => 'active',
+                'source' => 'Portal',
+                'priority' => 'normal',
             ]);
         }
 
         // A previously verified portal account signs straight in.
         if ($customer->email_verified_at !== null) {
             Auth::guard('customer')->login($customer);
-
-            $request->session()->regenerate();
+            $this->establishCustomerSession($request, $customer);
 
             return redirect()->intended($request->input('redirect') ?? route('customer.account'));
         }
@@ -249,8 +285,7 @@ class CustomerAuthController extends Controller
         $request->session()->forget('customer_pending_verification_id');
 
         Auth::guard('customer')->login($customer);
-
-        $request->session()->regenerate();
+        $this->establishCustomerSession($request, $customer);
 
         return redirect()->intended(route('customer.account'))
             ->with('status', __('Your email has been verified. Welcome!'));
@@ -267,8 +302,23 @@ class CustomerAuthController extends Controller
         return Customer::query()->find($id);
     }
 
+    private function establishCustomerSession(Request $request, Customer $customer): void
+    {
+        $request->session()->regenerate();
+
+        $customer->forceFill([
+            'active_session_id' => $request->session()->getId(),
+        ])->save();
+    }
+
     public function logout(Request $request): RedirectResponse
     {
+        $customer = Auth::guard('customer')->user();
+
+        if ($customer && hash_equals((string) $customer->active_session_id, $request->session()->getId())) {
+            $customer->forceFill(['active_session_id' => null])->save();
+        }
+
         Auth::guard('customer')->logout();
 
         $request->session()->invalidate();

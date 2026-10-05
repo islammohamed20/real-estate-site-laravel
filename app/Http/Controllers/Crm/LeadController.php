@@ -50,8 +50,12 @@ class LeadController extends Controller
             ->when($request->filled('assigned'), fn (Builder $q, $user) => $q->where('assigned_sales_id', $user))
             ->when($request->filled('status'), fn (Builder $q, $status) => $q->where('status', $status));
 
-        if (! auth()->user()?->hasAnyPermission(['view all leads', 'manage crm'])) {
-            $query->where('assigned_sales_id', auth()->id());
+        $user = auth()->user();
+        if (! $user?->hasAnyPermission(['view all leads', 'manage crm'])) {
+            $assignedIds = $user?->hasPermissionTo('view team leads')
+                ? $this->teamUserIds($user)
+                : [$user?->id];
+            $query->whereIn('assigned_sales_id', array_filter($assignedIds));
         }
 
         $leads = $query->latest()->paginate(15)->withQueryString();
@@ -264,11 +268,13 @@ class LeadController extends Controller
         }
 
         $normalized = WhatsApp::number($phone) ?? preg_replace('/[^0-9]/', '', $phone);
+        $canViewAll = auth()->user()->hasAnyPermission(['view all leads', 'manage crm']);
 
         $leads = Lead::query()
             ->where(function (Builder $q) use ($phone, $normalized): void {
                 $q->where('phone', $phone)->orWhere('phone', $normalized);
             })
+            ->when(! $canViewAll, fn (Builder $q) => $q->where('assigned_sales_id', auth()->id()))
             ->when($ignoreId > 0, fn (Builder $q) => $q->where('id', '!=', $ignoreId))
             ->with(['customer:id,name'])
             ->orderByDesc('id')
@@ -279,6 +285,7 @@ class LeadController extends Controller
             ->where(function (Builder $q) use ($phone, $normalized): void {
                 $q->where('phone', $phone)->orWhere('phone', $normalized);
             })
+            ->when(! $canViewAll, fn (Builder $q) => $q->whereHas('leads', fn (Builder $lead) => $lead->where('assigned_sales_id', auth()->id())))
             ->orderByDesc('id')
             ->limit(5)
             ->get(['id', 'name', 'phone', 'created_at']);
@@ -301,6 +308,20 @@ class LeadController extends Controller
                 'url' => route('dashboard.crm.customers.edit', $customer),
             ])->values(),
         ]);
+    }
+
+    private function teamUserIds(User $user): array
+    {
+        return $user->salesTeams()
+            ->where('sales_teams.is_active', true)
+            ->with('members:id')
+            ->get()
+            ->flatMap(fn ($team) => $team->members->pluck('id'))
+            ->merge($user->managedTeams()->where('is_active', true)->with('members:id')->get()->flatMap(fn ($team) => $team->members->pluck('id')))
+            ->push($user->id)
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function syncTags(Lead $lead, array $tagIds): void

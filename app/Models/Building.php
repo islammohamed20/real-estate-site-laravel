@@ -25,7 +25,10 @@ class Building extends Model
         'name',
         'code',
         'status',
+        'hidden_from_website',
         'sort_order',
+        'grid_x',
+        'grid_y',
     ];
 
     public function project(): BelongsTo
@@ -41,5 +44,10 @@ class Building extends Model
     public function floors(): HasMany
     {
         return $this->hasMany(Floor::class);
+    }
+
+    public function units(): HasMany
+    {
+        return $this->hasMany(Unit::class);
     }
 }

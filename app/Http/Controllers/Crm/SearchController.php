@@ -30,36 +30,48 @@ class SearchController extends Controller
         }
 
         $like = '%'.$term.'%';
+        $user = $request->user();
+        $canViewAll = $user->hasAnyPermission(['view reports', 'manage crm']);
 
         $results = [
             'leads' => Lead::query()
-                ->where('name', 'like', $like)
-                ->orWhere('email', 'like', $like)
-                ->orWhere('phone', 'like', $like)
+                ->where(function ($q) use ($like): void {
+                    $q->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                        ->orWhere('phone', 'like', $like);
+                })
+                ->when(! $canViewAll, fn ($q) => $q->where('assigned_sales_id', $user->id))
                 ->limit(10)
                 ->get(),
             'customers' => Customer::query()
-                ->where('name', 'like', $like)
-                ->orWhere('email', 'like', $like)
-                ->orWhere('phone', 'like', $like)
+                ->where(function ($q) use ($like): void {
+                    $q->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                        ->orWhere('phone', 'like', $like);
+                })
+                ->when(! $canViewAll, fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', $user->id)))
                 ->limit(10)
                 ->get(),
             'offers' => Offer::query()
                 ->where('offer_number', 'like', $like)
+                ->when(! $canViewAll, fn ($q) => $q->where('sales_id', $user->id))
                 ->limit(10)
                 ->get(),
             'reservations' => Reservation::query()
                 ->where('reservation_number', 'like', $like)
+                ->when(! $canViewAll, fn ($q) => $q->where('sales_id', $user->id))
                 ->limit(10)
                 ->get(),
             'projects' => Project::query()
-                ->where('name', 'like', $like)
-                ->orWhere('location', 'like', $like)
+                ->where(function ($q) use ($like): void {
+                    $q->where('name', 'like', $like)->orWhere('location', 'like', $like);
+                })
                 ->limit(10)
                 ->get(),
             'units' => Unit::query()
-                ->where('unit_number', 'like', $like)
-                ->orWhere('unit_type', 'like', $like)
+                ->where(function ($q) use ($like): void {
+                    $q->where('unit_number', 'like', $like)->orWhere('unit_type', 'like', $like);
+                })
                 ->limit(10)
                 ->get(),
         ];

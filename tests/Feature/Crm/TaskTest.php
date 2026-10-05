@@ -109,4 +109,25 @@ class TaskTest extends TestCase
 
         $this->assertEquals('completed', $task->fresh()->status);
     }
+
+    public function test_user_cannot_complete_another_users_task(): void
+    {
+        $owner = User::factory()->create(['is_active' => true]);
+        $actor = User::factory()->create(['is_active' => true]);
+        $actor->givePermissionTo(['view own tasks', 'edit own tasks']);
+        $customer = Customer::factory()->create();
+        $task = $customer->tasks()->create([
+            'title' => 'Private task',
+            'created_by' => $owner->id,
+            'assigned_to' => $owner->id,
+            'priority' => 'normal',
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($actor)
+            ->patchJson(route('dashboard.crm.tasks.complete', $task))
+            ->assertForbidden();
+
+        $this->assertEquals('open', $task->fresh()->status);
+    }
 }

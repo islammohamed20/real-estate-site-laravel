@@ -25,6 +25,12 @@ class TaskController extends Controller
     {
         $query = Task::query()
             ->with(['taskable', 'assignee', 'creator'])
+            ->when(! auth()->user()->hasAnyPermission(['view all tasks', 'manage crm']), function (Builder $q): void {
+                $q->where(function (Builder $scope): void {
+                    $scope->where('assigned_to', auth()->id())
+                        ->orWhere('created_by', auth()->id());
+                });
+            })
             ->when($request->filled('search'), function (Builder $q, $search) {
                 $q->where('title', 'like', "%{$search}%");
             })
@@ -57,9 +63,21 @@ class TaskController extends Controller
     public function store(TaskRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $taskable = match ($validated['related_type']) {
+            'lead' => Lead::query()->find($validated['related_id']),
+            'customer' => Customer::query()->find($validated['related_id']),
+            'deal' => CrmDeal::query()->find($validated['related_id']),
+            'project' => Project::query()->find($validated['related_id']),
+            'unit' => Unit::query()->find($validated['related_id']),
+        };
+
+        abort_unless($taskable, 404);
+        $this->authorize('view', $taskable);
+
         $validated['created_by'] = auth()->id();
-        $validated['taskable_type'] = $request->input('taskable_type');
-        $validated['taskable_id'] = $request->input('taskable_id');
+        $validated['taskable_type'] = $taskable::class;
+        $validated['taskable_id'] = $taskable->id;
+        unset($validated['related_type'], $validated['related_id']);
 
         Task::query()->create($validated);
 
@@ -68,6 +86,8 @@ class TaskController extends Controller
 
     public function update(Request $request, Task $task): RedirectResponse
     {
+        $this->authorizeTask($task);
+
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -89,6 +109,8 @@ class TaskController extends Controller
 
     public function destroy(Task $task): RedirectResponse
     {
+        $this->authorizeTask($task);
+
         $task->delete();
 
         return back()->with('status', __('Task deleted successfully.'));
@@ -96,11 +118,25 @@ class TaskController extends Controller
 
     public function complete(Task $task): JsonResponse
     {
+        $this->authorizeTask($task);
+
         $task->update([
             'status' => 'completed',
             'completed_at' => now(),
         ]);
 
         return response()->json(['message' => __('Task marked as completed.'), 'task' => $task->fresh()]);
+    }
+
+    private function authorizeTask(Task $task): void
+    {
+        if (auth()->user()->hasAnyPermission(['manage crm', 'edit all tasks', 'delete tasks'])) {
+            return;
+        }
+
+        abort_unless(
+            $task->assigned_to === auth()->id() || $task->created_by === auth()->id(),
+            403,
+        );
     }
 }

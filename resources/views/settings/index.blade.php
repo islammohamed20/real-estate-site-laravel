@@ -46,13 +46,13 @@
             </div>
         </section>
 
-        <section class="w-full rounded-2xl border border-white/5 bg-slate-900/40 p-1.5 backdrop-blur-sm">
-            <div class="flex w-full flex-nowrap gap-1.5 overflow-x-auto no-scrollbar">
+        <section class="w-full overflow-hidden rounded-2xl border border-white/5 bg-slate-900/40 p-2 backdrop-blur-sm">
+            <div class="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
                 @foreach($tabs as $key => $tab)
                     <button
                         type="button"
                         @click="activeTab = '{{ $key }}'"
-                        class="flex min-w-[130px] flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+                        class="flex min-w-0 w-full items-center justify-center gap-2 rounded-xl px-2 py-2.5 text-sm font-semibold transition sm:px-3"
                         :class="activeTab === '{{ $key }}' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 hover:bg-white/5 hover:text-white'"
                     >
                         @switch($tab['icon'])
@@ -322,6 +322,15 @@
 
                     <label class="space-y-2">
                         <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            <svg class="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.12 2 11.2c0 2.89 1.47 5.48 3.76 7.2L5 21l3.35-1.74c1.13.31 2.35.48 3.65.48 5.523 0 10-4.12 10-9.2S17.523 2 12 2Zm-2.4 14.1-3.1-1.65 3.45-3.65 1.65 1.65 3.7-2.2-3.45 3.65-1.65-1.65-3.7 2.2 3.1 1.65Z"/></svg>
+                            {{ __('Messenger URL') }}
+                        </span>
+                        <input class="app-input" name="messenger_url" value="{{ old('messenger_url', $profile->messenger_url) }}" placeholder="https://m.me/venecia" type="url" inputmode="url" dir="ltr">
+                        <p class="text-[11px] text-slate-500">{{ __('Use your Facebook Messenger page link, for example https://m.me/yourpage.') }}</p>
+                    </label>
+
+                    <label class="space-y-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
                             <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
                             {{ __('Instagram URL') }}
                         </span>
@@ -373,6 +382,17 @@
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">%</span>
                         </div>
                         <p class="text-xs text-slate-500">{{ __('Applied as a percentage on unit prices') }}</p>
+                    </label>
+
+                    <label class="space-y-2">
+                        <span class="flex items-center gap-2 text-sm font-medium text-slate-300">
+                            {{ __('Default Down Payment Percentage') }}
+                        </span>
+                        <div class="relative">
+                            <input class="app-input pr-8" name="default_down_payment_percent" value="{{ old('default_down_payment_percent', number_format($defaultDownPaymentPercent, 2, '.', '')) }}" type="number" step="0.1" min="0" max="100" required>
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">%</span>
+                        </div>
+                        <p class="text-xs text-slate-500">{{ __('Used as the default initial payment in public and dashboard calculators.') }}</p>
                     </label>
 
                 </div>
@@ -444,7 +464,7 @@
 
                         <label class="space-y-2">
                             <span class="text-sm font-medium text-slate-300">{{ __('API Key') }}</span>
-                            <input class="app-input" name="evolution_api_key" value="{{ old('evolution_api_key', $profile->evolution_api_key) }}" placeholder="your-api-key" type="password">
+                            <input class="app-input" name="evolution_api_key" value="{{ old('evolution_api_key') }}" placeholder="{{ $profile->evolution_api_key ? __('Configured — leave blank to keep the current key') : __('Enter Evolution API key') }}" type="password" autocomplete="new-password">
                         </label>
 
                         <label class="space-y-2 sm:col-span-2">
@@ -540,7 +560,17 @@
                 </div>
             </section>
 
-            {{-- Security --}}
+            {{-- Save Button --}}
+            <div class="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p class="text-sm text-slate-400">{{ __('Changes are saved immediately.') }}</p>
+                <button type="submit" class="app-button">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8"/><path d="M17 21v-8H7v8M7 3v5h8" stroke-width="1.8"/></svg>
+                    {{ __('Save All Settings') }}
+                </button>
+            </div>
+        </form>
+
+        {{-- Security --}}
             <section x-show="activeTab === 'security'" x-cloak class="app-card app-card--gradient space-y-5">
                 <div>
                     <h2 class="text-lg font-semibold text-white">{{ __('Security & Access') }}</h2>
@@ -636,6 +666,52 @@
                     </div>
                 </div>
 
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <svg class="mt-0.5 h-5 w-5 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+                            <div>
+                                <p class="text-sm font-semibold text-white">{{ __('Passkeys') }}</p>
+                                <p class="mt-1 text-xs text-slate-400">{{ __('Add a fingerprint or device passkey to sign in without a password and confirm sensitive actions.') }}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="register-passkey" class="app-button">
+                                {{ __('Register a new passkey') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (auth()->user()->passkeys->count())
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="w-full text-left text-sm text-slate-300">
+                                <thead class="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
+                                    <tr>
+                                        <th class="pb-3 pr-4">{{ __('Name') }}</th>
+                                        <th class="pb-3 pr-4">{{ __('Added') }}</th>
+                                        <th class="pb-3 pr-4"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach (auth()->user()->passkeys as $passkey)
+                                        <tr>
+                                            <td class="py-3 pr-4">{{ $passkey->name }}</td>
+                                            <td class="py-3 pr-4">{{ $passkey->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                                            <td class="py-3 pr-4 text-right">
+                                                <form method="POST" action="/user/passkeys/{{ $passkey->id }}" data-passkey-confirm>
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-rose-400 hover:text-rose-300">{{ __('Remove') }}</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-slate-300">
                         <thead class="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
@@ -719,7 +795,6 @@
                     {{ __('Save All Settings') }}
                 </button>
             </div>
-        </form>
 
         {{-- Notification preferences (personal, per signed-in user) --}}
         <section x-show="activeTab === 'notifications'" x-cloak class="app-card app-card--gradient space-y-5">
@@ -765,3 +840,31 @@
         </section>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const button = document.getElementById('register-passkey');
+        if (!button) return;
+
+        button.addEventListener('click', () => {
+            if (!window.Passkeys || !window.Passkeys.isSupported()) {
+                alert('{{ __('Passkeys are not supported on this device.') }}');
+                return;
+            }
+
+            const name = prompt('{{ __('Device name (e.g. iPhone, Android, MacBook)') }}', '');
+            if (!name) return;
+
+            window.Passkeys.register({ name })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    console.error('Passkey registration failed:', error);
+                    alert(error?.message || '{{ __('Passkey registration failed.') }}');
+                });
+        });
+    })();
+</script>
+@endpush

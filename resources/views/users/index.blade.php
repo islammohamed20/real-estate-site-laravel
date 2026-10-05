@@ -19,6 +19,11 @@
         permsCount: 0,
         permsAction: '',
         perms: [],
+        rolePerms: [],
+        resetOpen: false,
+        resetName: '',
+        resetEmail: '',
+        resetAction: '',
         openPermissions(btn) {
             this.permsId = btn.dataset.userId;
             this.permsName = btn.dataset.userName;
@@ -26,10 +31,20 @@
             this.permsCount = btn.dataset.userCount;
             this.permsAction = btn.dataset.userAction;
             this.perms = JSON.parse(btn.dataset.userPerms || '[]');
+            this.rolePerms = JSON.parse(btn.dataset.userRolePerms || '[]');
             this.permsOpen = true;
         },
         closePermissions() {
             this.permsOpen = false;
+        },
+        openReset(btn) {
+            this.resetName = btn.dataset.userName;
+            this.resetEmail = btn.dataset.userEmail;
+            this.resetAction = btn.dataset.userAction;
+            this.resetOpen = true;
+        },
+        closeReset() {
+            this.resetOpen = false;
         },
         matchUser(name, email, roles, isActive) {
             const q = this.search.trim().toLowerCase();
@@ -38,7 +53,7 @@
             const matchStatus = !this.statusFilter || (this.statusFilter === 'active' && isActive) || (this.statusFilter === 'disabled' && !isActive);
             return matchQuery && matchRole && matchStatus;
         }
-    }" @keydown.escape.window="permsOpen = false">
+    }" @keydown.escape.window="permsOpen = false; resetOpen = false">
 
         {{-- Hero Header --}}
         <section class="dashboard-hero-card p-6 sm:p-8">
@@ -64,6 +79,7 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2 pt-1">
+                        <a href="{{ route('dashboard.departments.index') }}" class="app-button text-xs sm:text-sm">{{ __('Manage Departments') }}</a>
                         <a href="{{ route('dashboard.home') }}" class="app-button--ghost text-xs sm:text-sm">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8"/><path d="M9 22V12h6v10" stroke-width="1.8"/></svg>
                             {{ __('Dashboard') }}
@@ -255,15 +271,16 @@
                                                 data-user-id="{{ $user->id }}"
                                                 data-user-name="{{ $user->name }}"
                                                 data-user-email="{{ $user->email }}"
-                                                data-user-count="{{ $user->permissions->count() }}"
+                                                data-user-count="{{ count($user->allPermissionNames()) }}"
                                                 data-user-action="{{ route('dashboard.users.permissions', $user) }}"
                                                 data-user-perms='@json($user->permissions->pluck('name'))'
+                                                data-user-role-perms='@json($user->rolePermissionNames())'
                                                 @click="openPermissions($el)"
                                                 class="inline-flex h-8 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:border-white/20"
                                                 title="{{ __('Permissions') }}"
                                             >
                                                 <svg class="h-3.5 w-3.5 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" stroke-width="1.8"/></svg>
-                                                <span class="tabular-nums text-[11px]">{{ $user->permissions->count() }}</span>
+                                                <span class="tabular-nums text-[11px]">{{ count($user->allPermissionNames()) }}</span>
                                             </button>
 
                                             {{-- Role Selector --}}
@@ -279,6 +296,23 @@
                                                 </button>
                                             </form>
                                         @endif
+
+                                        <a href="{{ route('dashboard.users.edit', $user) }}" class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:border-white/20" title="{{ __('Edit User') }}" aria-label="{{ __('Edit User') }}">
+                                            <svg class="h-3.5 w-3.5 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9" stroke-linecap="round"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" stroke-linejoin="round"/></svg>
+                                        </a>
+
+                                        {{-- Reset Password --}}
+                                        <button
+                                            type="button"
+                                            data-user-name="{{ $user->name }}"
+                                            data-user-email="{{ $user->email }}"
+                                            data-user-action="{{ route('dashboard.users.password', $user) }}"
+                                            @click="openReset($el)"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:border-white/20"
+                                            title="{{ __('Reset Password') }}"
+                                        >
+                                            <svg class="h-3.5 w-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+                                        </button>
 
                                         {{-- Toggle Active --}}
                                         @if ($user->is_active)
@@ -443,7 +477,7 @@
                             </h3>
                         </div>
                         <p class="mt-1 truncate text-xs text-slate-400 font-mono">
-                            <span x-text="permsEmail"></span> · <span class="text-white font-semibold" x-text="permsCount"></span> {{ __('direct permissions') }}
+                            <span x-text="permsEmail"></span> · <span class="text-white font-semibold" x-text="permsCount"></span> {{ __('effective permissions') }}
                         </p>
                     </div>
                     <button type="button" class="-me-2 -mt-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white/10 hover:text-white" @click="closePermissions()" aria-label="{{ __('Close') }}">
@@ -466,9 +500,10 @@
                                     </div>
                                     <div class="space-y-1.5">
                                         @foreach ($perms as $perm)
-                                            <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs text-slate-300 transition hover:bg-white/5 hover:text-white">
-                                                <input type="checkbox" name="permissions[]" value="{{ $perm }}" :checked="perms.includes('{{ $perm }}')" class="h-4 w-4 rounded border-white/20 bg-slate-900 text-brand-600 focus:ring-0 focus:ring-offset-0">
+                                            <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs text-slate-300 transition hover:bg-white/5 hover:text-white" :class="rolePerms.includes('{{ $perm }}') ? 'opacity-60 cursor-not-allowed' : ''">
+                                                <input type="checkbox" name="permissions[]" value="{{ $perm }}" :checked="perms.includes('{{ $perm }}') || rolePerms.includes('{{ $perm }}')" :disabled="rolePerms.includes('{{ $perm }}')" class="h-4 w-4 rounded border-white/20 bg-slate-900 text-brand-600 focus:ring-0 focus:ring-offset-0">
                                                 <span class="truncate">{{ $perm }}</span>
+                                                <span x-show="rolePerms.includes('{{ $perm }}')" class="ms-auto rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-slate-400" x-cloak>{{ __('from role') }}</span>
                                             </label>
                                         @endforeach
                                     </div>
@@ -484,6 +519,52 @@
                             <button type="button" class="app-button--ghost text-xs" @click="closePermissions()">{{ __('Cancel') }}</button>
                             <button type="submit" class="app-button px-5 py-2 text-xs font-bold text-white">{{ __('Save Permissions') }}</button>
                         </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {{-- Reset Password modal --}}
+        <div x-show="resetOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="{{ __('Reset Password') }}">
+            <div class="absolute inset-0 bg-black/70 backdrop-blur-md" @click="closeReset()"></div>
+
+            <div class="relative w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-5 shadow-2xl shadow-black/60 backdrop-blur-2xl" x-show="resetOpen" x-transition.scale.origin.center>
+                {{-- Header --}}
+                <div class="flex items-start justify-between gap-4 border-b border-white/10 bg-white/[0.02] p-5 sm:p-6 -m-5 mb-5 rounded-t-3xl">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+                            </span>
+                            <h3 class="truncate text-lg font-bold text-white">
+                                {{ __('Reset Password') }}
+                            </h3>
+                        </div>
+                        <p class="mt-1 truncate text-xs text-slate-400 font-mono">
+                            <span x-text="resetName"></span> · <span x-text="resetEmail"></span>
+                        </p>
+                    </div>
+                    <button type="button" class="-me-2 -mt-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white/10 hover:text-white" @click="closeReset()" aria-label="{{ __('Close') }}">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+
+                {{-- Body --}}
+                <form :action="resetAction" method="POST" class="space-y-4" data-passkey-confirm>
+                    @csrf
+                    <div>
+                        <label for="reset-password" class="mb-2 block text-sm font-medium text-slate-300">{{ __('New Password') }}</label>
+                        <input type="password" id="reset-password" name="password" class="app-input w-full" minlength="8" required autocomplete="new-password" placeholder="{{ __('Min 8 characters') }}">
+                    </div>
+                    <div>
+                        <label for="reset-password-confirmation" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Confirm New Password') }}</label>
+                        <input type="password" id="reset-password-confirmation" name="password_confirmation" class="app-input w-full" required autocomplete="new-password" placeholder="{{ __('Confirm password') }}">
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-white/10 bg-white/[0.02] p-4 sm:p-5 -m-5 mt-5 rounded-b-3xl">
+                        <button type="button" class="app-button--ghost text-xs" @click="closeReset()">{{ __('Cancel') }}</button>
+                        <button type="submit" class="app-button px-5 py-2 text-xs font-bold text-white">{{ __('Update Password') }}</button>
                     </div>
                 </form>
             </div>

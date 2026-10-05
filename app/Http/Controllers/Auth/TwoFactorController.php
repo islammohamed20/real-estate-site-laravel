@@ -22,7 +22,13 @@ class TwoFactorController extends Controller
      */
     public function showChallenge(): View
     {
-        return view('auth.two-factor-challenge');
+        /** @var User $user */
+        $user = auth()->user();
+
+        return view('auth.two-factor-challenge', [
+            'showTotp' => $user?->two_factor_enabled ?? false,
+            'showPasskey' => $user?->passkeys()->exists() ?? false,
+        ]);
     }
 
     /**

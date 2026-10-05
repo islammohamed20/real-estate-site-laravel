@@ -14,8 +14,10 @@ use App\Models\Reservation;
 use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ReservationController extends Controller
@@ -24,7 +26,14 @@ class ReservationController extends Controller
     {
         $this->authorize('viewAny', Reservation::class);
 
+        $canViewAll = auth()->user()->hasAnyPermission(['view reports', 'manage crm']);
+
         $reservations = Reservation::query()
+            ->when(! $canViewAll, fn ($q) => $q->where(function ($scope): void {
+                $scope->where('sales_id', auth()->id())
+                    ->orWhereHas('lead', fn ($lead) => $lead->where('assigned_sales_id', auth()->id()))
+                    ->orWhereHas('customer.leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id()));
+            }))
             ->with(['customer', 'lead', 'unit.project', 'sales'])
             ->when($request->filled('search'), function (Builder $q, $search) {
                 $q->where('reservation_number', 'like', "%{$search}%")
@@ -50,8 +59,12 @@ class ReservationController extends Controller
 
         return view('crm.reservations.form', [
             'reservation' => null,
-            'customers' => Customer::query()->orderBy('name')->pluck('name', 'id'),
-            'leads' => Lead::query()->orderBy('name')->pluck('name', 'id'),
+            'customers' => Customer::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id())))
+                ->orderBy('name')->pluck('name', 'id'),
+            'leads' => Lead::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->where('assigned_sales_id', auth()->id()))
+                ->orderBy('name')->pluck('name', 'id'),
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
             'units' => Unit::query()->with('project')->orderBy('unit_number')->get()->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]),
         ]);
@@ -64,7 +77,11 @@ class ReservationController extends Controller
         $data['sales_id'] = auth()->id();
         $data['reserved_at'] = $data['reserved_at'] ?? now();
 
-        $reservation = Reservation::query()->create($data);
+        $reservation = DB::transaction(function () use ($data): Reservation {
+            $this->guardActiveReservation($data);
+
+            return Reservation::query()->create($data);
+        });
 
         // Push notification: new reservation
         app(PushNotificationService::class)->notifyCrmEvent(
@@ -98,8 +115,12 @@ class ReservationController extends Controller
 
         return view('crm.reservations.form', [
             'reservation' => $reservation,
-            'customers' => Customer::query()->orderBy('name')->pluck('name', 'id'),
-            'leads' => Lead::query()->orderBy('name')->pluck('name', 'id'),
+            'customers' => Customer::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id())))
+                ->orderBy('name')->pluck('name', 'id'),
+            'leads' => Lead::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->where('assigned_sales_id', auth()->id()))
+                ->orderBy('name')->pluck('name', 'id'),
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
             'units' => Unit::query()->with('project')->orderBy('unit_number')->get()->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]),
         ]);
@@ -107,7 +128,12 @@ class ReservationController extends Controller
 
     public function update(ReservationRequest $request, Reservation $reservation): RedirectResponse
     {
-        $reservation->update($request->validated());
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $reservation): void {
+            $this->guardActiveReservation($data, $reservation);
+            $reservation->update($data);
+        });
 
         return redirect()->route('dashboard.crm.reservations.show', $reservation)
             ->with('status', __('Reservation updated successfully.'));
@@ -121,5 +147,38 @@ class ReservationController extends Controller
 
         return redirect()->route('dashboard.crm.reservations.index')
             ->with('status', __('Reservation deleted successfully.'));
+    }
+
+    /**
+     * Serialize active reservations through the unit row so two concurrent
+     * requests cannot reserve the same unit after both pass form validation.
+     */
+    private function guardActiveReservation(array $data, ?Reservation $current = null): void
+    {
+        $status = $data['status'] ?? $current?->status ?? 'pending';
+
+        if (! in_array($status, ['pending', 'paid'], true)) {
+            return;
+        }
+
+        $unitId = (int) ($data['unit_id'] ?? $current?->unit_id);
+        $unit = Unit::query()->lockForUpdate()->findOrFail($unitId);
+
+        $conflict = Reservation::query()
+            ->where('unit_id', $unitId)
+            ->whereIn('status', ['pending', 'paid'])
+            ->when($current, fn ($query) => $query->whereKeyNot($current->getKey()))
+            ->exists();
+
+        $sameUnit = $current && (int) $current->unit_id === $unitId;
+        $statusValue = is_object($unit->status) ? $unit->status->value : (string) $unit->status;
+        $unitUnavailable = in_array($statusValue, ['sold', 'hidden'], true)
+            || (! $sameUnit && $statusValue !== 'available');
+
+        if ($conflict || $unitUnavailable) {
+            throw ValidationException::withMessages([
+                'unit_id' => __('This unit is not available for reservation.'),
+            ]);
+        }
     }
 }

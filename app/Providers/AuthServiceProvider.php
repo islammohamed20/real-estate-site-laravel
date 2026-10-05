@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Models\Building;
 use App\Models\CompanyProfile;
+use App\Models\Crm\CrmContact;
 use App\Models\Crm\CrmDeal;
 use App\Models\Customer;
 use App\Models\Floor;
@@ -19,6 +20,7 @@ use App\Models\Reservation;
 use App\Models\Unit;
 use App\Policies\BuildingPolicy;
 use App\Policies\CompanyProfilePolicy;
+use App\Policies\CrmContactPolicy;
 use App\Policies\CrmDealPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\FloorPolicy;
@@ -42,6 +44,7 @@ class AuthServiceProvider extends ServiceProvider
         Floor::class => FloorPolicy::class,
         Unit::class => UnitPolicy::class,
         Customer::class => CustomerPolicy::class,
+        CrmContact::class => CrmContactPolicy::class,
         CrmDeal::class => CrmDealPolicy::class,
         Lead::class => LeadPolicy::class,
         Offer::class => OfferPolicy::class,

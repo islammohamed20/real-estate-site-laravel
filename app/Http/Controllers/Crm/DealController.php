@@ -28,6 +28,8 @@ class DealController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', CrmDeal::class);
+
         $pipelineId = $request->input('pipeline', CrmPipeline::query()->where('is_default', true)->value('id'));
 
         $pipelines = CrmPipeline::query()
@@ -40,9 +42,18 @@ class DealController extends Controller
 
         $stages = $pipeline?->stages ?? collect();
 
+        $user = auth()->user();
+        $canViewAllDeals = $user->hasAnyPermission(['view all deals', 'manage crm']);
+        $visibleUserIds = $user->hasPermissionTo('view team deals')
+            ? $this->teamUserIds($user)
+            : [$user->id];
+
         $dealsQuery = CrmDeal::query()
             ->with(['contact', 'organization', 'assignedUser', 'activities' => fn ($q) => $q->latest()->limit(3)])
             ->where('pipeline_id', $pipeline?->id ?? 0)
+            ->when(! $canViewAllDeals, fn ($q) => $q->where(fn ($scope) => $scope
+                ->whereIn('assigned_to', $visibleUserIds)
+                ->orWhereIn('created_by', $visibleUserIds)))
             ->when($request->filled('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->filled('assigned'), fn ($q, $user) => $q->where('assigned_to', $user))
             ->when($request->filled('search'), function ($q, $search): void {
@@ -56,11 +67,16 @@ class DealController extends Controller
 
         $deals = $dealsQuery->get()->groupBy('stage_id');
 
+        $statsQuery = CrmDeal::query()
+            ->when(! $canViewAllDeals, fn ($q) => $q->where(fn ($scope) => $scope
+                ->whereIn('assigned_to', $visibleUserIds)
+                ->orWhereIn('created_by', $visibleUserIds)));
+
         $stats = [
-            'open_deals' => CrmDeal::query()->where('status', 'open')->count(),
-            'won_deals' => CrmDeal::query()->where('status', 'won')->count(),
-            'lost_deals' => CrmDeal::query()->where('status', 'lost')->count(),
-            'total_value' => CrmDeal::query()->whereIn('status', ['open', 'won'])->sum('value'),
+            'open_deals' => (clone $statsQuery)->where('status', 'open')->count(),
+            'won_deals' => (clone $statsQuery)->where('status', 'won')->count(),
+            'lost_deals' => (clone $statsQuery)->where('status', 'lost')->count(),
+            'total_value' => (clone $statsQuery)->whereIn('status', ['open', 'won'])->sum('value'),
         ];
 
         return view('crm.deals.index', [
@@ -84,6 +100,8 @@ class DealController extends Controller
 
     public function show(CrmDeal $deal): View
     {
+        $this->authorize('view', $deal);
+
         $deal->load([
             'pipeline.stages',
             'stage',
@@ -124,6 +142,8 @@ class DealController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', CrmDeal::class);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'pipeline_id' => 'required|exists:crm_pipelines,id',
@@ -176,6 +196,8 @@ class DealController extends Controller
 
     public function update(Request $request, CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('update', $deal);
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'pipeline_id' => 'sometimes|required|exists:crm_pipelines,id',
@@ -235,6 +257,8 @@ class DealController extends Controller
 
     public function moveStage(Request $request, CrmDeal $deal): JsonResponse
     {
+        $this->authorize('moveStage', $deal);
+
         $validated = $request->validate([
             'stage_id' => 'required|exists:crm_stages,id',
             'status' => 'nullable|in:open,won,lost',
@@ -288,6 +312,8 @@ class DealController extends Controller
 
     public function storeActivity(Request $request, CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('update', $deal);
+
         $validated = $request->validate([
             'type' => 'required|in:'.implode(',', CrmActivity::types()),
             'subject' => 'nullable|string|max:255',
@@ -311,6 +337,9 @@ class DealController extends Controller
 
     public function updateActivity(Request $request, CrmDeal $deal, CrmActivity $activity): RedirectResponse
     {
+        $this->authorize('update', $deal);
+        abort_unless($activity->deal_id === $deal->id, 404);
+
         $validated = $request->validate([
             'subject' => 'nullable|string|max:255',
             'body' => 'nullable|string',
@@ -328,6 +357,9 @@ class DealController extends Controller
 
     public function destroyActivity(CrmDeal $deal, CrmActivity $activity): RedirectResponse
     {
+        $this->authorize('update', $deal);
+        abort_unless($activity->deal_id === $deal->id, 404);
+
         $activity->delete();
 
         return redirect()->back()->with('success', __('Activity deleted.'));
@@ -335,9 +367,25 @@ class DealController extends Controller
 
     public function destroy(CrmDeal $deal): RedirectResponse
     {
+        $this->authorize('delete', $deal);
+
         $deal->delete();
 
         return redirect()->route('dashboard.crm.deals.index')->with('success', __('Deal deleted.'));
+    }
+
+    private function teamUserIds(User $user): array
+    {
+        return $user->salesTeams()
+            ->where('sales_teams.is_active', true)
+            ->with('members:id')
+            ->get()
+            ->flatMap(fn ($team) => $team->members->pluck('id'))
+            ->merge($user->managedTeams()->where('is_active', true)->with('members:id')->get()->flatMap(fn ($team) => $team->members->pluck('id')))
+            ->push($user->id)
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function recordActivity(CrmDeal $deal, string $type, ?string $subject, ?string $body, ?int $contactId): void

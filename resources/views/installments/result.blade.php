@@ -20,7 +20,7 @@
                             <p class="text-sm font-bold text-white">{{ $unit->unit_number }} <span class="font-normal text-slate-400">·</span> {{ $unit->unit_type }}</p>
                             <p class="text-xs text-slate-400">{{ $unit->project?->name }} — {{ number_format((float) $unit->area) }} {{ __('m²') }}</p>
                         </div>
-                        <a href="{{ route('public.units.show', $unit->unit_number) }}" class="ms-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-300 transition hover:text-brand-200">
+                        <a href="{{ route('public.units.show', $unit->id) }}" class="ms-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-300 transition hover:text-brand-200">
                             {{ __('عرض الوحدة') }}
                             <svg class="h-3.5 w-3.5 rtl:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M13 6l6 6-6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </a>
@@ -134,7 +134,7 @@
                     </div>
 
                     @if (auth('web')->check() || auth('customer')->check())
-                        <form id="installment-pdf-form" method="POST" action="{{ route($calculatorRoutes['pdf']) }}" class="space-y-4">
+                        <form id="installment-pdf-form" method="POST" action="{{ route($calculatorRoutes['pdf']) }}" class="space-y-4" data-download>
                             @csrf
                             @foreach ($input as $key => $value)
                                 @continue(in_array($key, ['offer_id', 'customer_id'], true))
@@ -292,12 +292,16 @@
                         @endif
 
                         <div class="space-y-3">
-                            <button type="submit" form="installment-pdf-form" class="app-button w-full">{{ __('Generate PDF') }}</button>
                             @if (! $customerPortal)
-                                <button type="submit" form="installment-save-form" class="app-button w-full">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8"/><path d="M17 21v-8H7v8M7 3v5h8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    {{ __('Save to CRM') }}
-                                </button>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button type="submit" form="installment-save-form" class="app-button w-full">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8"/><path d="M17 21v-8H7v8M7 3v5h8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        {{ __('Save to CRM') }}
+                                    </button>
+                                    <button type="submit" form="installment-pdf-form" class="app-button w-full">{{ __('Generate PDF') }}</button>
+                                </div>
+                            @else
+                                <button type="submit" form="installment-pdf-form" class="app-button w-full">{{ __('Generate PDF') }}</button>
                             @endif
                             <a href="{{ route($calculatorRoutes['index'], $input) }}" class="app-button--ghost w-full">{{ __('Edit inputs') }}</a>
                         </div>

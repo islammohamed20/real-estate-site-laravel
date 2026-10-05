@@ -57,6 +57,7 @@ class LoginController extends Controller
         $user?->forceFill([
             'last_login_at' => now(),
             'last_login_ip' => $request->ip(),
+            'active_session_id' => $request->session()->getId(),
         ])->save();
 
         LoginHistory::create([
@@ -70,9 +71,9 @@ class LoginController extends Controller
             'logged_in_at' => now(),
         ]);
 
-        // Users with two-factor authentication enabled must pass the one-time
-        // TOTP / recovery-code challenge before entering the dashboard.
-        if ($user?->two_factor_enabled) {
+        // Users with a configured second factor (Google Authenticator or Passkey)
+        // must complete a second step before entering the dashboard.
+        if ($user?->needsSecondFactor()) {
             $request->session()->put('2fa:user:id', $user->id);
 
             return redirect()->route('2fa.verify');
@@ -128,6 +129,10 @@ class LoginController extends Controller
                 ->latest('logged_in_at')
                 ->first()
                 ?->update(['logged_out_at' => now()]);
+        }
+
+        if ($user && hash_equals((string) $user->active_session_id, $request->session()->getId())) {
+            $user->forceFill(['active_session_id' => null])->save();
         }
 
         Auth::logout();

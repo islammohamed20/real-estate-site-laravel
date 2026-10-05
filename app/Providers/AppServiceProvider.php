@@ -8,12 +8,14 @@ use App\Models\Crm\CrmDeal;
 use App\Models\Reservation;
 use App\Observers\CrmDealObserver;
 use App\Observers\ReservationObserver;
+use App\Passkeys\JsonConfirmationResponse;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as BaseEventServiceProvider;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View as ViewContract;
+use Laravel\Passkeys\Contracts\PasskeyConfirmationResponse as PasskeyConfirmationResponseContract;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->singleton(PasskeyConfirmationResponseContract::class, JsonConfirmationResponse::class);
+
         CrmDeal::observe(CrmDealObserver::class);
         Reservation::observe(ReservationObserver::class);
 

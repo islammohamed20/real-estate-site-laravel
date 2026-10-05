@@ -23,11 +23,28 @@ class FollowUpRequest extends FormRequest
             'follow_up_at' => ['required', 'date'],
             'type' => ['required', 'in:phone_call,whatsapp,email,meeting,site_visit,follow_up,other'],
             'priority' => ['nullable', 'in:low,normal,high,urgent'],
-            'channel' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:4000'],
             'reminder' => ['nullable', 'boolean'],
             'status' => ['nullable', 'in:pending,completed,cancelled,overdue'],
             'completed_at' => ['nullable', 'date'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $related = array_filter([
+                $this->input('lead_id'),
+                $this->input('customer_id'),
+                $this->input('deal_id'),
+            ], fn ($value) => filled($value));
+
+            if (count($related) !== 1) {
+                $validator->errors()->add(
+                    'customer_id',
+                    __('Select exactly one customer, lead or deal for this follow-up.'),
+                );
+            }
+        });
     }
 }

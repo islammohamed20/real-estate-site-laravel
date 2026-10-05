@@ -40,6 +40,10 @@
                     <input type="email" name="email" value="{{ old('email') }}" required inputmode="email" autocomplete="email" class="app-input transition-all duration-300 focus:scale-[1.01]" placeholder="{{ __('you@company.com') }}">
                 </label>
 
+                <div class="stagger-item" style="animation-delay:320ms">
+                    @include('partials.turnstile')
+                </div>
+
                 <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:360ms">{{ __('Send reset link') }}</button>
             </form>
 

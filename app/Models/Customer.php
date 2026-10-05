@@ -40,6 +40,7 @@ class Customer extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'active_session_id',
     ];
 
     protected function casts(): array
@@ -62,6 +63,11 @@ class Customer extends Authenticatable
     public function leads(): HasMany
     {
         return $this->hasMany(Lead::class);
+    }
+
+    public function salesUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'customer_sales_user')->withTimestamps();
     }
 
     public function interestedProjects(): BelongsToMany

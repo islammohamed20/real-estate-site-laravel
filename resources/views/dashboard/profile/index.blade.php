@@ -79,8 +79,8 @@
 
                     <div class="sm:col-span-2">
                         <label for="department" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Department') }}</label>
-                        <input type="text" id="department" name="department" class="app-input" value="{{ old('department', $user->department) }}">
-                        @error('department') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                        <input type="text" id="department" class="app-input opacity-75" value="{{ $user->department }}" readonly>
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Department assignment is managed by an administrator.') }}</p>
                     </div>
                 </div>
             </section>

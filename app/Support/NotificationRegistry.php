@@ -49,6 +49,16 @@ class NotificationRegistry
             'title_en' => 'Failed login attempt',
             'title_ar' => 'محاولة دخول فاشلة',
         ],
+        'followup_created' => [
+            'permission' => 'receive notification.followups',
+            'title_en' => 'New follow-up assigned',
+            'title_ar' => 'متابعة جديدة مسندة',
+        ],
+        'followup_reminder' => [
+            'permission' => 'receive notification.followups',
+            'title_en' => 'Upcoming follow-up reminder',
+            'title_ar' => 'تذكير بمتابعة قادمة',
+        ],
         'followup_overdue' => [
             'permission' => 'receive notification.followups',
             'title_en' => 'Overdue follow-up',

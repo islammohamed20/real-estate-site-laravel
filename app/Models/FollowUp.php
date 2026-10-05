@@ -21,6 +21,7 @@ class FollowUp extends Model
         'created_by',
         'follow_up_at',
         'completed_at',
+        'overdue_notified_at',
         'type',
         'channel',
         'priority',
@@ -34,6 +35,7 @@ class FollowUp extends Model
         return [
             'follow_up_at' => 'datetime',
             'completed_at' => 'datetime',
+            'overdue_notified_at' => 'datetime',
             'reminder' => 'boolean',
         ];
     }

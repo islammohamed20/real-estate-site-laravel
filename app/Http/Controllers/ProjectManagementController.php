@@ -9,20 +9,31 @@ use App\Models\Building;
 use App\Models\Crm\CrmDeal;
 use App\Models\Floor;
 use App\Models\InstallmentPlan;
+use App\Models\InstallmentTemplate;
 use App\Models\Offer;
 use App\Models\Project;
 use App\Models\Reservation;
 use App\Models\Unit;
 use App\Services\PushNotificationService;
 use App\Support\Features;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class ProjectManagementController extends Controller
 {
@@ -50,6 +61,203 @@ class ProjectManagementController extends Controller
         ]);
     }
 
+    public function exportUnitsReport(Request $request, Project $project): BinaryFileResponse
+    {
+        $this->authorize('view', $project);
+
+        $columnLabels = [
+            'building' => __('Building'),
+            'building_visibility' => __('Building visibility'),
+            'floor' => __('Floor'),
+            'unit_number' => __('Unit number'),
+            'unit_type' => __('Unit type'),
+            'status' => __('Status'),
+            'unit_visibility' => __('Unit visibility'),
+            'area' => __('Area').' (m²)',
+            'garden_area' => __('Garden area').' (m²)',
+            'roof_area' => __('Roof area').' (m²)',
+            'balcony_area' => __('Balcony area').' (m²)',
+            'bedrooms' => __('Bedrooms'),
+            'bathrooms' => __('Bathrooms'),
+            'price_per_meter' => __('Price per m²'),
+            'excellence_percent' => __('Excellence percentage'),
+            'current_price' => __('Current price'),
+            'delivery_date' => __('Delivery date'),
+            'featured' => __('Featured'),
+        ];
+
+        $validated = $request->validate([
+            'include_hidden' => ['nullable', 'boolean'],
+            'columns' => ['nullable', 'array', 'min:1'],
+            'columns.*' => ['string', Rule::in(array_keys($columnLabels))],
+        ]);
+        $includeHidden = (bool) ($validated['include_hidden'] ?? false);
+        $selectedColumns = array_values(array_intersect(
+            array_keys($columnLabels),
+            $validated['columns'] ?? array_keys($columnLabels),
+        ));
+        $columnIndexes = array_map(fn (string $column): int => array_search($column, array_keys($columnLabels), true), $selectedColumns);
+        $lastColumn = Coordinate::stringFromColumnIndex(count($selectedColumns));
+
+        $buildings = $project->buildings()
+            ->when(! $includeHidden, fn ($query) => $query->where('hidden_from_website', false))
+            ->with(['units.floor'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getProperties()
+            ->setCreator(config('app.name'))
+            ->setTitle(__('Unit inventory report').' - '.$project->name)
+            ->setSubject(__('Unit statuses and details'));
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle(__('Units'));
+        $sheet->setRightToLeft(app()->getLocale() === 'ar');
+        $sheet->mergeCells('A1:'.$lastColumn.'1');
+        $sheet->setCellValue('A1', __('Unit inventory report').' — '.$project->name);
+        $sheet->mergeCells('A2:'.$lastColumn.'2');
+        $sheet->setCellValue(
+            'A2',
+            __('Generated at').': '.now()->format('Y-m-d H:i').' | '
+            .__('Buildings scope').': '.($includeHidden ? __('Visible and hidden buildings') : __('Visible buildings only')).' | '
+            .__('Buildings').': '.$buildings->count().' | '.__('Units').': '.$buildings->sum(fn (Building $building) => $building->units->count()),
+        );
+
+        $headers = array_map(fn (string $column): string => $columnLabels[$column], $selectedColumns);
+        $sheet->fromArray($headers, null, 'A4');
+
+        $row = 5;
+        foreach ($buildings as $building) {
+            $units = $building->units->sortBy(fn (Unit $unit) => sprintf(
+                '%08d-%08d-%s',
+                (int) ($unit->floor?->sort_order ?? PHP_INT_MAX),
+                (int) $unit->sort_order,
+                (string) $unit->unit_number,
+            ));
+
+            if ($units->isEmpty()) {
+                $values = [
+                    $building->name,
+                    $building->hidden_from_website ? __('Hidden') : __('Visible'),
+                    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+                ];
+                $this->writeSpreadsheetRow($sheet, $row++, array_map(fn (int $index) => $values[$index], $columnIndexes));
+
+                continue;
+            }
+
+            foreach ($units as $unit) {
+                $status = $unit->status?->value ?? (string) $unit->status;
+                $values = [
+                    $building->name,
+                    $building->hidden_from_website ? __('Hidden') : __('Visible'),
+                    $unit->floor?->name ?: ($unit->floor?->number !== null ? __('Floor :number', ['number' => $unit->floor->number]) : ''),
+                    $unit->unit_number,
+                    $unit->unit_type,
+                    __(ucfirst($status)),
+                    $unit->hidden_from_website ? __('Hidden') : __('Visible'),
+                    (float) $unit->area,
+                    (float) $unit->garden_area,
+                    (float) $unit->roof_area,
+                    (float) $unit->balcony_area,
+                    (int) $unit->bedrooms,
+                    (int) $unit->bathrooms,
+                    (float) $unit->price_per_meter,
+                    (float) $unit->excellence_percent,
+                    (float) $unit->current_price,
+                    $unit->delivery_date?->format('Y-m-d') ?? '',
+                    $unit->featured ? __('Yes') : __('No'),
+                ];
+                $this->writeSpreadsheetRow($sheet, $row, array_map(fn (int $index) => $values[$index], $columnIndexes));
+
+                $statusColor = match ($status) {
+                    UnitStatus::Available->value => 'DCFCE7',
+                    UnitStatus::Reserved->value => 'FEF3C7',
+                    UnitStatus::Sold->value => 'FFE4E6',
+                    default => 'E2E8F0',
+                };
+                $statusIndex = array_search('status', $selectedColumns, true);
+                if ($statusIndex !== false) {
+                    $statusColumn = Coordinate::stringFromColumnIndex($statusIndex + 1);
+                    $sheet->getStyle($statusColumn.$row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($statusColor);
+                }
+                $row++;
+            }
+        }
+
+        $lastRow = max(4, $row - 1);
+        $sheet->freezePane('A5');
+        $sheet->setAutoFilter('A4:'.$lastColumn.$lastRow);
+        $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFF'], 'size' => 16],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => '0F172A']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(30);
+        $sheet->getStyle('A2:'.$lastColumn.'2')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['argb' => '334155']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'F1F5F9']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $sheet->getStyle('A4:'.$lastColumn.'4')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => '2563EB']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+        ]);
+        $sheet->getStyle('A4:'.$lastColumn.$lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('CBD5E1');
+        $numericColumns = ['area', 'garden_area', 'roof_area', 'balcony_area', 'bedrooms', 'bathrooms', 'price_per_meter', 'excellence_percent', 'current_price'];
+        foreach ($selectedColumns as $index => $column) {
+            $letter = Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->getColumnDimension($letter)->setAutoSize(true);
+            if (in_array($column, $numericColumns, true) && $lastRow >= 5) {
+                $sheet->getStyle($letter.'5:'.$letter.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+            }
+        }
+        if ($lastRow >= 5) {
+            $sheet->getStyle('A5:'.$lastColumn.$lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        }
+
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'venecia-units-');
+        (new Xlsx($spreadsheet))->save($temporaryPath);
+        $spreadsheet->disconnectWorksheets();
+
+        $archive = new ZipArchive;
+        if ($archive->open($temporaryPath) === true) {
+            $contentTypes = $archive->getFromName('[Content_Types].xml');
+            if (is_string($contentTypes)) {
+                $contentTypes = str_replace(
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
+                    'application/vnd.ms-excel.sheet.macroEnabled.main+xml',
+                    $contentTypes,
+                );
+                $archive->addFromString('[Content_Types].xml', $contentTypes);
+            }
+            $archive->close();
+        }
+
+        $filename = Str::slug($project->name) ?: 'project-'.$project->id;
+
+        return response()->download(
+            $temporaryPath,
+            $filename.'-units-'.now()->format('Y-m-d').'.xlsm',
+            ['Content-Type' => 'application/vnd.ms-excel.sheet.macroEnabled.12'],
+        )->deleteFileAfterSend(true);
+    }
+
+    private function writeSpreadsheetRow($sheet, int $row, array $values): void
+    {
+        foreach ($values as $offset => $value) {
+            $column = chr(65 + $offset);
+            if (is_int($value) || is_float($value)) {
+                $sheet->setCellValue($column.$row, $value);
+            } else {
+                $sheet->setCellValueExplicit($column.$row, (string) $value, DataType::TYPE_STRING);
+            }
+        }
+    }
+
     public function create(): View
     {
         return view('dashboard.projects.form', [
@@ -66,6 +274,7 @@ class ProjectManagementController extends Controller
             'slug' => ['nullable', 'string', 'max:100', 'alpha_dash', Rule::unique('projects', 'slug')],
             'code' => ['nullable', 'string', 'max:50'],
             'price_per_meter' => ['nullable', 'numeric', 'min:0'],
+            'max_installment_years' => ['required', 'integer', 'min:1', 'max:50'],
             'description' => ['nullable', 'string'],
             'cover_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:8192'],
             'images' => ['nullable', 'array'],
@@ -79,6 +288,7 @@ class ProjectManagementController extends Controller
             'map_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'map_lng' => ['nullable', 'numeric', 'between:-180,180'],
             'status' => ['required', 'string', 'in:draft,launching,active,sold'],
+            'current_phase' => ['nullable', 'string', 'max:255'],
             'featured' => ['boolean'],
             'sort_order' => ['integer', 'min:0'],
             'published_at' => ['nullable', 'date'],
@@ -114,10 +324,10 @@ class ProjectManagementController extends Controller
         $project->load([
             'buildings' => fn ($q) => $q->orderBy('sort_order')->with([
                 'floors' => fn ($fq) => $fq->orderByDesc('number')->with([
-                    'units' => fn ($uq) => $uq->orderBy('sort_order')->orderBy('unit_number')
-                ])
+                    'units' => fn ($uq) => $uq->orderBy('sort_order')->orderBy('unit_number'),
+                ]),
             ]),
-            'units' => fn ($uq) => $uq->with(['building', 'floor'])->orderBy('sort_order')->orderBy('unit_number')
+            'units' => fn ($uq) => $uq->with(['building', 'floor'])->orderBy('sort_order')->orderBy('unit_number'),
         ]);
 
         return view('dashboard.projects.form', [
@@ -129,11 +339,166 @@ class ProjectManagementController extends Controller
                     'name' => $building->name,
                     'code' => $building->code,
                     'floors_count' => max(1, $building->floors->count()),
+                    'hidden_from_website' => (bool) $building->hidden_from_website,
                 ])
                 ->values()
                 ->all(),
             'units' => $project->units,
         ]);
+    }
+
+    public function layout(Project $project): View
+    {
+        $project->load([
+            'buildings' => fn ($query) => $query
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->with(['floors' => fn ($floorQuery) => $floorQuery
+                    ->orderByDesc('number')
+                    ->with(['units' => fn ($unitQuery) => $unitQuery
+                        ->orderBy('sort_order')
+                        ->orderBy('unit_number')])]),
+        ]);
+
+        $allProjects = Project::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'code', 'status', 'location']);
+
+        $layoutData = $this->buildLayoutData($project);
+        $defaultDownPaymentPercent = (float) (InstallmentTemplate::query()
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->value('down_payment_percent') ?? 25);
+
+        return view('dashboard.projects.layout', [
+            'project' => $project,
+            'allProjects' => $allProjects,
+            'layoutData' => $layoutData,
+            'defaultDownPaymentPercent' => $defaultDownPaymentPercent,
+        ]);
+    }
+
+    public function layoutData(Project $project): JsonResponse
+    {
+        $project->load([
+            'buildings' => fn ($query) => $query
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->with(['floors' => fn ($floorQuery) => $floorQuery
+                    ->orderByDesc('number')
+                    ->with(['units' => fn ($unitQuery) => $unitQuery
+                        ->orderBy('sort_order')
+                        ->orderBy('unit_number')])]),
+        ]);
+
+        return response()->json([
+            'buildings' => $this->buildLayoutData($project),
+        ]);
+    }
+
+    /**
+     * Build the 3D layout data structure for the project.
+     */
+    private function buildLayoutData(Project $project): array
+    {
+        return $project->buildings->map(fn (Building $building) => [
+            'id' => $building->id,
+            'name' => $building->name,
+            'code' => $building->code,
+            'units_count' => $building->units()->count(),
+            'available_count' => $building->units()->where('status', UnitStatus::Available->value)->count(),
+            'reserved_count' => $building->units()->where('status', UnitStatus::Reserved->value)->count(),
+            'sold_count' => $building->units()->where('status', UnitStatus::Sold->value)->count(),
+            'floors' => $building->floors->map(fn (Floor $floor) => [
+                'id' => $floor->id,
+                'building_id' => $building->id,
+                'number' => $floor->number,
+                'name' => $floor->number === 0 ? __('Ground floor') : __('Floor :number', ['number' => $floor->number]),
+                'bulk_status_url' => route('dashboard.projects.floors.units.status', [$project, $floor]),
+                'units' => $floor->units->map(fn (Unit $unit) => [
+                    'id' => $unit->id,
+                    'number' => (string) $unit->unit_number,
+                    'type' => (string) ($unit->unit_type ?? ''),
+                    'area' => (float) $unit->area,
+                    'price' => (float) $unit->current_price,
+                    'price_per_meter' => (float) $unit->price_per_meter,
+                    'garden_area' => (float) $unit->garden_area,
+                    'roof_area' => (float) $unit->roof_area,
+                    'balcony_area' => (float) $unit->balcony_area,
+                    'terrace_count' => (int) $unit->terrace_count,
+                    'status' => $unit->status?->value ?? 'available',
+                    'hidden_from_website' => (bool) $unit->hidden_from_website,
+                    'featured' => (bool) $unit->featured,
+                    'bedrooms' => (int) $unit->bedrooms,
+                    'bathrooms' => (int) $unit->bathrooms,
+                    'thumbnail' => $unit->thumbnail ? asset('storage/'.$unit->thumbnail) : null,
+                    'floor_plan' => $unit->floor_plan_path ? asset('storage/'.$unit->floor_plan_path) : null,
+                    'building_id' => $building->id,
+                    'building_name' => $building->name,
+                    'building_code' => $building->code,
+                    'floor_id' => $floor->id,
+                    'floor_number' => $floor->number,
+                    'floor_name' => $floor->number === 0 ? __('Ground floor') : __('Floor :number', ['number' => $floor->number]),
+                    'status_url' => route('dashboard.projects.units.status', [$project, $unit]),
+                    'edit_url' => route('dashboard.projects.units.edit', [$project, $unit]),
+                    'public_url' => route('public.units.show', $unit->id),
+                    'calculator_url' => route('installments.index', ['unit_id' => $unit->id]),
+                ])->values()->all(),
+            ])->values()->all(),
+        ])->values()->all();
+    }
+
+    public function updateFloorUnitsStatus(Request $request, Project $project, Floor $floor): RedirectResponse|JsonResponse
+    {
+        abort_unless((int) $floor->project_id === (int) $project->id, 404);
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::enum(UnitStatus::class)],
+            'hidden_from_website' => ['nullable', 'boolean'],
+        ]);
+
+        $floor->units()->update([
+            'status' => $validated['status'],
+            'hidden_from_website' => $validated['status'] === UnitStatus::Sold->value ? false : $request->boolean('hidden_from_website'),
+            'updated_at' => now(),
+        ]);
+
+        $message = __('Floor units status updated successfully.');
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()
+            ->route('dashboard.projects.layout', $project)
+            ->with('status', $message);
+    }
+
+    public function updateUnitStatus(Request $request, Project $project, Unit $unit): RedirectResponse|JsonResponse
+    {
+        abort_unless((int) $unit->project_id === (int) $project->id, 404);
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::enum(UnitStatus::class)],
+            'hidden_from_website' => ['nullable', 'boolean'],
+        ]);
+
+        $unit->update([
+            'status' => $validated['status'],
+            'hidden_from_website' => $validated['status'] === UnitStatus::Sold->value ? false : $request->boolean('hidden_from_website'),
+        ]);
+
+        $message = __('Unit status updated successfully.');
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()
+            ->route('dashboard.projects.layout', $project)
+            ->with('status', $message);
     }
 
     public function update(Request $request, Project $project): RedirectResponse
@@ -143,6 +508,7 @@ class ProjectManagementController extends Controller
             'slug' => ['nullable', 'string', 'max:100', 'alpha_dash', Rule::unique('projects', 'slug')->ignore($project->id)],
             'code' => ['nullable', 'string', 'max:50', Rule::unique('projects', 'code')->ignore($project->id)],
             'price_per_meter' => ['nullable', 'numeric', 'min:0'],
+            'max_installment_years' => ['required', 'integer', 'min:1', 'max:50'],
             'description' => ['nullable', 'string'],
             'cover_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:8192'],
             'images' => ['nullable', 'array'],
@@ -156,6 +522,7 @@ class ProjectManagementController extends Controller
             'map_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'map_lng' => ['nullable', 'numeric', 'between:-180,180'],
             'status' => ['required', 'string', 'in:draft,launching,active,sold'],
+            'current_phase' => ['nullable', 'string', 'max:255'],
             'featured' => ['boolean'],
             'sort_order' => ['integer', 'min:0'],
             'published_at' => ['nullable', 'date'],
@@ -283,6 +650,7 @@ class ProjectManagementController extends Controller
 
         $unit = Unit::query()->create([
             ...$validated,
+            'hidden_from_website' => $validated['status'] === UnitStatus::Sold->value ? false : $validated['hidden_from_website'],
             'project_id' => $project->id,
             'phase_id' => $building->phase_id,
             'building_id' => $building->id,
@@ -387,6 +755,7 @@ class ProjectManagementController extends Controller
 
         $unit->update([
             ...$validated,
+            'hidden_from_website' => $validated['status'] === UnitStatus::Sold->value ? false : $validated['hidden_from_website'],
             'project_id' => $project->id,
             'phase_id' => $building->phase_id,
             'building_id' => $building->id,
@@ -530,15 +899,34 @@ class ProjectManagementController extends Controller
         $this->authorize('delete', $building);
         $this->assertOwnTrashedRecord($building);
 
-        if (Unit::withTrashed()->where('building_id', $building->id)->exists()) {
+        if (! $this->cascadeDeleteBuilding($building)) {
             return back()->withErrors([
-                'delete' => __('This building cannot be permanently deleted because it contains units.'),
+                'delete' => __('This building cannot be permanently deleted because one or more of its units have related offers, reservations, deals, or installment plans.'),
             ]);
+        }
+
+        return back()->with('status', __('Building permanently deleted.'));
+    }
+
+    /**
+     * Permanently delete a building and all of its units/floors.
+     * Returns false if any unit has related records that would be lost.
+     */
+    private function cascadeDeleteBuilding(Building $building): bool
+    {
+        $units = Unit::withTrashed()->where('building_id', $building->id)->get();
+
+        foreach ($units as $unit) {
+            if ($this->hasUnitRelatedRecords($unit)) {
+                return false;
+            }
+
+            $unit->forceDelete();
         }
 
         $building->forceDelete();
 
-        return back()->with('status', __('Building permanently deleted.'));
+        return true;
     }
 
     /**
@@ -758,6 +1146,7 @@ class ProjectManagementController extends Controller
             }
 
             $floorsCount = min(10, max(1, (int) ($data['floors_count'] ?? 1)));
+            $hiddenFromWebsite = (bool) ($data['hidden_from_website'] ?? false);
             $buildingId = isset($data['id']) && is_numeric($data['id']) ? (int) $data['id'] : null;
 
             $building = $buildingId !== null
@@ -771,11 +1160,13 @@ class ProjectManagementController extends Controller
                     'name' => $name,
                     'code' => 'BLD-'.str_pad((string) $order, 2, '0', STR_PAD_LEFT),
                     'status' => 'active',
+                    'hidden_from_website' => $hiddenFromWebsite,
                     'sort_order' => $order,
                 ]);
             } else {
                 $building->update([
                     'name' => $name,
+                    'hidden_from_website' => $hiddenFromWebsite,
                     'sort_order' => $order,
                 ]);
             }

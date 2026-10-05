@@ -8,6 +8,26 @@
         $featured = (int) ($stats['featured_units'] ?? 0);
         $projectCollection = collect($projects->items());
         $projectCount = count($projects);
+        $exportColumns = [
+            'building' => __('Building'),
+            'building_visibility' => __('Building visibility'),
+            'floor' => __('Floor'),
+            'unit_number' => __('Unit number'),
+            'unit_type' => __('Unit type'),
+            'status' => __('Status'),
+            'unit_visibility' => __('Unit visibility'),
+            'area' => __('Area'),
+            'garden_area' => __('Garden area'),
+            'roof_area' => __('Roof area'),
+            'balcony_area' => __('Balcony area'),
+            'bedrooms' => __('Bedrooms'),
+            'bathrooms' => __('Bathrooms'),
+            'price_per_meter' => __('Price per m²'),
+            'excellence_percent' => __('Excellence percentage'),
+            'current_price' => __('Current price'),
+            'delivery_date' => __('Delivery date'),
+            'featured' => __('Featured'),
+        ];
     @endphp
 
     @if (session('status'))
@@ -132,7 +152,7 @@
                     };
                 @endphp
 
-                <article class="stagger-item app-card app-card--gradient overflow-hidden transition-all duration-300 hover:border-brand-500/30 hover:bg-white/[0.08]" style="animation-delay:{{ 100 + $loop->index * 60 }}ms">
+                <article x-data="{ exportOpen: false, includeHidden: false, allExportColumns: {{ json_encode(array_keys($exportColumns)) }}, selectedColumns: {{ json_encode(array_keys($exportColumns)) }} }" class="stagger-item app-card app-card--gradient overflow-hidden transition-all duration-300 hover:border-brand-500/30 hover:bg-white/[0.08]" style="animation-delay:{{ 100 + $loop->index * 60 }}ms">
                     <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                         {{-- Project Cover Image --}}
                         @if ($coverUrl)
@@ -181,8 +201,14 @@
                                     <p class="mt-1 text-base font-black tabular-nums text-white">{{ number_format((int) ($project->buildings_count ?? 0)) }}</p>
                                 </div>
                                 <div class="rounded-xl border border-white/10 bg-white/5 p-2.5 text-center">
-                                    <p class="text-[9px] font-bold uppercase tracking-wider text-slate-400">{{ __('Floors') }}</p>
-                                    <p class="mt-1 text-base font-black tabular-nums text-white">{{ number_format((int) ($project->floors_count ?? 0)) }}</p>
+                                    <p class="text-[9px] font-bold uppercase tracking-wider text-slate-400">{{ __('Floors/Building') }}</p>
+                                    <p class="mt-1 text-base font-black tabular-nums text-white">
+                                        @if(($project->buildings_count ?? 0) > 0)
+                                            {{ number_format((int) ceil(($project->floors_count ?? 0) / $project->buildings_count)) }}
+                                        @else
+                                            {{ number_format((int) ($project->floors_count ?? 0)) }}
+                                        @endif
+                                    </p>
                                 </div>
                                 <div class="rounded-xl border border-white/10 bg-white/5 p-2.5 text-center">
                                     <p class="text-[9px] font-bold uppercase tracking-wider text-slate-400">{{ __('Total Units') }}</p>
@@ -222,24 +248,31 @@
                         <div class="flex shrink-0 flex-col gap-3 lg:items-end w-full lg:w-72">
                             <div class="flex flex-wrap gap-2 w-full lg:justify-end">
                                 @can('update', $project)
-                                    <a href="{{ route('dashboard.projects.edit', $project) }}" class="app-button flex-1 lg:flex-none justify-center gap-1.5 !py-2.5 text-xs font-bold">
+                                    <a href="{{ route('dashboard.projects.edit', $project) }}" class="app-button p-2.5" title="{{ __('Edit & Building Matrix') }}">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-width="1.8"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="1.8"/></svg>
-                                        {{ __('Edit & Building Matrix') }}
                                     </a>
                                 @endcan
                                 @can('create', App\Models\Unit::class)
-                                    <a href="{{ route('dashboard.projects.units.create', $project) }}" class="app-button--ghost justify-center !py-2.5 text-xs">
-                                        {{ __('+ Add Unit') }}
+                                    <a href="{{ route('dashboard.projects.units.create', $project) }}" class="app-button--ghost p-2.5" title="{{ __('Add Unit') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
                                     </a>
                                 @endcan
-                                <a href="{{ route('public.projects.show', $project->slug) }}" target="_blank" class="app-button--ghost p-2.5 text-slate-400 hover:text-white" title="{{ __('Public View') }}">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke-width="1.8"/><polyline points="15 3 21 3 21 9" stroke-width="1.8"/><line x1="10" y1="14" x2="21" y2="3" stroke-width="1.8"/></svg>
+                                @hasanyrole(['Administrator', 'Owner', 'Sales Manager', 'Data Entry', 'Accountant'])
+                                    <a href="{{ route('dashboard.projects.layout', $project) }}" class="app-button--ghost p-2.5" title="{{ __('3D Layout') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m4 15 8-4 8 4-8 4-8-4Z" stroke-width="1.8" stroke-linejoin="round"/><path d="m4 9 8-4 8 4M4 15v4l8 4 8-4v-4" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                    </a>
+                                @endhasanyrole
+                                <button type="button" @click="exportOpen = true" class="app-button--ghost p-2.5 text-emerald-400 hover:text-emerald-300" title="{{ __('Export unit report') }}">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.8"/><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                </button>
+                                <a href="{{ route('dashboard.site-plan', ['project_id' => $project->id]) }}" class="app-button--ghost p-2.5 text-slate-400 hover:text-white" title="{{ __('Project Map') }}" aria-label="{{ __('Project Map') }}">
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 3v15M15 6v15" stroke-width="1.8"/></svg>
                                 </a>
                                 @can('delete', $project)
                                     <form id="delete-project-{{ $project->id }}" method="POST" action="{{ route('dashboard.projects.destroy', $project) }}" class="inline">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="button" onclick="confirmAction('{{ __('Delete project') }}', '{{ __('Are you sure you want to delete :name? Any related units, offers, reservations, or deals must be removed first.', ['name' => $project->name]) }}', () => document.getElementById('delete-project-{{ $project->id }}').submit(), '{{ __('Delete') }}')" class="app-button app-button--danger p-2.5 text-xs" title="{{ __('Delete') }}">
+                                        <button type="button" onclick="confirmAction('{{ __('Delete project') }}', '{{ __('Are you sure you want to delete :name? Any related units, offers, reservations, or deals must be removed first.', ['name' => $project->name]) }}', () => document.getElementById('delete-project-{{ $project->id }}').submit(), '{{ __('Delete') }}', true)" class="app-button app-button--danger p-2.5 text-xs" title="{{ __('Delete') }}">
                                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" stroke-width="1.8"/></svg>
                                         </button>
                                     </form>
@@ -267,6 +300,69 @@
                             </div>
                         </div>
                     </div>
+
+                    <template x-teleport="body">
+                        <div x-show="exportOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" @keydown.escape.window="exportOpen = false" @click.self="exportOpen = false">
+                            <div x-show="exportOpen" x-transition class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="export-title-{{ $project->id }}">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400">
+                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.8"/><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                        </span>
+                                        <div>
+                                            <h3 id="export-title-{{ $project->id }}" class="text-lg font-bold text-white">{{ __('Export unit report') }}</h3>
+                                            <p class="mt-1 text-xs text-slate-400">{{ $project->name }}</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" @click="exportOpen = false" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label="{{ __('Close') }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/></svg>
+                                    </button>
+                                </div>
+
+                                <form action="{{ route('dashboard.projects.units-report', $project) }}" method="GET" class="mt-6 space-y-5" @submit="exportOpen = false">
+                                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                        <label class="flex cursor-pointer items-start gap-3">
+                                            <input type="checkbox" name="include_hidden" value="1" x-model="includeHidden" class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-500 focus:ring-emerald-500/30">
+                                            <span>
+                                                <span class="block text-sm font-semibold text-white">{{ __('Include hidden buildings') }}</span>
+                                                <span class="mt-1 block text-xs leading-5 text-slate-400">{{ __('Export hidden buildings together with the buildings currently visible on the website.') }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                        <div class="mb-3 flex items-center justify-between gap-3">
+                                            <div>
+                                                <span class="block text-sm font-semibold text-white">{{ __('Excel columns') }}</span>
+                                                <span class="mt-1 block text-xs text-slate-400">{{ __('Choose the columns to include in the exported report.') }}</span>
+                                            </div>
+                                            <button type="button" class="text-xs font-semibold text-brand-300 hover:text-brand-200" @click="selectedColumns = selectedColumns.length === allExportColumns.length ? [] : [...allExportColumns]" x-text="selectedColumns.length === allExportColumns.length ? '{{ __('Clear all') }}' : '{{ __('Select all') }}'"></button>
+                                        </div>
+                                        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                            @foreach($exportColumns as $column => $label)
+                                                <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/5 bg-slate-950/40 px-3 py-2 text-xs text-slate-300 transition hover:border-brand-500/30 hover:text-white">
+                                                    <input type="checkbox" name="columns[]" value="{{ $column }}" x-model="selectedColumns" class="h-4 w-4 rounded border-white/20 bg-slate-950 text-brand-500 focus:ring-brand-500/30">
+                                                    <span>{{ $label }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                        <p x-show="selectedColumns.length === 0" x-cloak class="mt-3 text-xs font-semibold text-rose-400">{{ __('Select at least one column.') }}</p>
+                                    </div>
+
+                                    <div class="rounded-2xl border border-brand-500/20 bg-brand-500/5 px-4 py-3 text-xs leading-5 text-slate-300">
+                                        {{ __('The report includes only the columns selected above.') }}
+                                    </div>
+                                    <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                        <button type="button" @click="exportOpen = false" class="app-button--ghost justify-center">{{ __('Cancel') }}</button>
+                                        <button type="submit" :disabled="selectedColumns.length === 0" :class="selectedColumns.length === 0 ? 'cursor-not-allowed opacity-50' : ''" class="app-button justify-center bg-emerald-600 hover:bg-emerald-500">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            {{ __('Export XLSM') }}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </template>
                 </article>
             @empty
                 <div class="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-white/[0.02] py-16 text-center">

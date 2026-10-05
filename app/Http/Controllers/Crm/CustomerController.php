@@ -28,7 +28,9 @@ class CustomerController extends Controller
         $this->authorize('viewAny', Customer::class);
 
         $query = Customer::query()
-            ->with(['leads', 'tags', 'interestedProjects'])
+            // Portal registrations remain visible in Leads until an internal user converts them.
+            ->whereNotIn('source', ['portal', 'Portal'])
+            ->with(['leads', 'tags', 'interestedProjects', 'salesUsers'])
             ->withCount('leads')
             ->when($request->filled('search'), function (Builder $q, $search) {
                 $q->where(function (Builder $sub) use ($search) {
@@ -160,6 +162,25 @@ class CustomerController extends Controller
 
         return redirect()->route('dashboard.crm.customers.show', $customer)
             ->with('status', __('Customer updated successfully.'));
+    }
+
+    public function assignSales(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->authorize('update', $customer);
+
+        $validated = $request->validate([
+            'assigned_sales_id' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_sales_ids' => ['nullable', 'array'],
+            'assigned_sales_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $assignedIds = array_key_exists('assigned_sales_id', $validated)
+            ? ($validated['assigned_sales_id'] ? [$validated['assigned_sales_id']] : [])
+            : ($validated['assigned_sales_ids'] ?? []);
+
+        $customer->salesUsers()->sync($assignedIds);
+
+        return back()->with('status', __('Customer sales assignment updated successfully.'));
     }
 
     public function destroy(Customer $customer): RedirectResponse

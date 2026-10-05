@@ -1,10 +1,12 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
 import Chart from 'chart.js/auto';
+import { Passkeys } from '@laravel/passkeys';
 import { initPwa } from './pwa';
 
 window.Alpine = Alpine;
 window.Chart = Chart;
+window.Passkeys = Passkeys;
 
 Alpine.start();
 initPwa();
@@ -93,7 +95,7 @@ if (window.__flash?.message) {
 }
 
 // Generic confirmation modal
-window.confirmAction = function (title, message, onConfirm, confirmText = 'Confirm') {
+window.confirmAction = function (title, message, onConfirm, confirmText = 'Confirm', requirePasskey = false) {
   const modal = document.getElementById('app-confirm-modal');
   if (!modal) return onConfirm ? onConfirm() : null;
 
@@ -111,6 +113,27 @@ window.confirmAction = function (title, message, onConfirm, confirmText = 'Confi
   const newConfirm = confirmBtn.cloneNode(true);
   confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
   newConfirm.addEventListener('click', () => {
+    if (requirePasskey) {
+      if (!window.Passkeys || !window.Passkeys.isSupported()) {
+        window.toast?.danger?.('Passkey authentication is not supported on this device.');
+        return;
+      }
+
+      window.Passkeys.verify({
+        routes: {
+          options: '/passkeys/confirm/options',
+          submit: '/passkeys/confirm',
+        },
+      }).then(() => {
+        if (typeof onConfirm === 'function') onConfirm();
+        cleanup();
+      }).catch((error) => {
+        window.toast?.danger?.(error?.message || 'Passkey verification failed or was cancelled.');
+      });
+
+      return;
+    }
+
     if (typeof onConfirm === 'function') onConfirm();
     cleanup();
   });
@@ -176,3 +199,68 @@ document.addEventListener('keydown', (e) => {
     saveForm(visibleShortcutForm);
   }
 });
+
+// Require a passkey confirmation before submitting forms marked with data-passkey-confirm.
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  const submitter = e.submitter;
+  if (!form.matches('form[data-passkey-confirm]') && !submitter?.matches('[data-passkey-confirm]')) return;
+  if (form.dataset.passkeyConfirmed) return;
+
+  if (!window.Passkeys || !window.Passkeys.isSupported()) {
+    e.preventDefault();
+    window.toast?.danger?.('Passkey authentication is not supported on this device.');
+    return;
+  }
+
+  e.preventDefault();
+
+  window.Passkeys.verify({
+    routes: {
+      options: '/passkeys/confirm/options',
+      submit: '/passkeys/confirm',
+    },
+  }).then(() => {
+    form.dataset.passkeyConfirmed = '1';
+    form.requestSubmit(submitter || undefined);
+  }).catch((error) => {
+    window.toast?.danger?.(error?.message || 'Passkey verification failed or was cancelled.');
+  });
+});
+
+// Login page passkey sign-in button.
+const passkeySignin = document.getElementById('passkey-signin');
+if (passkeySignin && window.Passkeys && window.Passkeys.isSupported()) {
+  passkeySignin.classList.remove('hidden');
+
+  passkeySignin.addEventListener('click', () => {
+    window.Passkeys.verify()
+      .then((response) => {
+        window.location.href = response?.redirect || '/real-statement-control';
+      })
+      .catch((error) => {
+        console.error('Passkey login failed:', error);
+      });
+  });
+}
+
+// Two-factor challenge passkey verification button.
+const passkey2fa = document.getElementById('passkey-2fa');
+if (passkey2fa && window.Passkeys && window.Passkeys.isSupported()) {
+  passkey2fa.classList.remove('hidden');
+
+  passkey2fa.addEventListener('click', () => {
+    const optionsRoute = passkey2fa.dataset.options || '/real-statement-control/2fa/passkey/options';
+    const submitRoute = passkey2fa.dataset.submit || '/real-statement-control/2fa/passkey/verify';
+
+    window.Passkeys.verify({
+      routes: { options: optionsRoute, submit: submitRoute },
+    })
+      .then((response) => {
+        window.location.href = response?.redirect || '/real-statement-control';
+      })
+      .catch((error) => {
+        window.toast?.danger?.(error?.message || 'Passkey verification failed or was cancelled.');
+      });
+  });
+}

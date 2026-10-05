@@ -2,18 +2,21 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Admin\HomeSectionController;
 use App\Http\Controllers\Admin\AutomationController;
-use App\Http\Controllers\Admin\MaintenanceController;
+use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmailTemplateController;
+use App\Http\Controllers\Admin\HomeSectionController;
+use App\Http\Controllers\Admin\MaintenanceController;
 use App\Http\Controllers\Admin\SalesEvaluationController;
 use App\Http\Controllers\Admin\SalesPerformanceController;
 use App\Http\Controllers\Admin\SalesTargetController;
 use App\Http\Controllers\Admin\SalesTeamController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\Api\GeminiUsageController;
 use App\Http\Controllers\Auth\CustomerAuthController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasskeyTwoFactorController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\BannerController;
@@ -22,7 +25,6 @@ use App\Http\Controllers\Crm\CrmTrashController;
 use App\Http\Controllers\Crm\CustomerController;
 use App\Http\Controllers\Crm\DataTransferController;
 use App\Http\Controllers\Crm\DealController;
-use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\Crm\DocumentController;
 use App\Http\Controllers\Crm\FollowUpController;
 use App\Http\Controllers\Crm\InstallmentPlanController;
@@ -33,8 +35,13 @@ use App\Http\Controllers\Crm\ReservationController;
 use App\Http\Controllers\Crm\SearchController;
 use App\Http\Controllers\Crm\TaskController;
 use App\Http\Controllers\CrmController;
+use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\Dashboard\LiveStatusController;
+use App\Http\Controllers\Dashboard\PushNotificationController;
+use App\Http\Controllers\Dashboard\SitePlanController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardTrashController;
+use App\Http\Controllers\FacebookWebhookController;
 use App\Http\Controllers\InstallmentCalculatorController;
 use App\Http\Controllers\LeadInquiryController;
 use App\Http\Controllers\LocalizationController;
@@ -43,6 +50,7 @@ use App\Http\Controllers\ProjectManagementController;
 use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
@@ -70,10 +78,17 @@ Route::get('/favicon.ico', function () {
 Route::get('/auth/refresh-token', function () {
     return response()->json(['token' => csrf_token()]);
 })->name('auth.refresh-token');
+
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/robots.txt', [SitemapController::class, 'robots'])->name('robots');
+
 Route::middleware('track_visitor')->group(function (): void {
     Route::get('/projects', [PublicWebsiteController::class, 'projects'])->name('public.projects.index');
     Route::get('/projects/{slug}', [PublicWebsiteController::class, 'projectShow'])->name('public.projects.show');
-    Route::get('/units/{unitNumber}', [PublicWebsiteController::class, 'unitShow'])->name('public.units.show');
+    Route::get('/units/{unit}', [PublicWebsiteController::class, 'unitShow'])->name('public.units.show');
+    Route::get('/portfolio', [PublicWebsiteController::class, 'portfolio'])->name('public.portfolio');
+    Route::get('/portfolio/pdf', [PublicWebsiteController::class, 'portfolioPdf'])->name('public.portfolio.pdf');
+    Route::get('/track-record', fn () => redirect()->route('public.portfolio', [], 301));
     Route::get('/about', [PublicWebsiteController::class, 'about'])->name('public.about');
     Route::get('/contact', [PublicWebsiteController::class, 'contact'])->name('public.contact');
 });
@@ -84,7 +99,6 @@ Route::post('/inquiries', [LeadInquiryController::class, 'store'])
 Route::get('/calculator', [InstallmentCalculatorController::class, 'index'])->name('installments.index');
 Route::post('/calculator', [InstallmentCalculatorController::class, 'calculate'])->name('installments.calculate');
 Route::post('/calculator/pdf', [InstallmentCalculatorController::class, 'pdf'])
-    ->middleware('auth:customer')
     ->name('installments.pdf');
 Route::post('/calculator/save', [InstallmentCalculatorController::class, 'save'])
     ->middleware('auth:customer')
@@ -119,11 +133,14 @@ Route::post('/real-statement-control/logout', [LoginController::class, 'destroy'
     ->middleware(['auth', 'active'])
     ->name('logout');
 
-// ===== Two-Factor Authentication (Google Authenticator) =====
-// Challenge is reachable right after login for users with 2FA enabled.
+// ===== Two-Factor Authentication (Google Authenticator or Passkey) =====
+// Challenge is reachable right after login for users with a second factor configured.
 Route::middleware('auth')->group(function (): void {
     Route::get('/real-statement-control/2fa/verify', [TwoFactorController::class, 'showChallenge'])->name('2fa.verify');
     Route::post('/real-statement-control/2fa/verify', [TwoFactorController::class, 'verifyChallenge'])->name('2fa.verify.store');
+
+    Route::get('/real-statement-control/2fa/passkey/options', [PasskeyTwoFactorController::class, 'options'])->name('2fa.passkey.options');
+    Route::post('/real-statement-control/2fa/passkey/verify', [PasskeyTwoFactorController::class, 'verify'])->name('2fa.passkey.verify');
 });
 
 // ===== Customer portal authentication =====
@@ -249,6 +266,7 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::get('/{customer}', [CustomerController::class, 'show'])->name('show');
         Route::get('/{customer}/edit', [CustomerController::class, 'edit'])->name('edit')->middleware('permission:edit all customers|edit own customers|manage crm');
         Route::put('/{customer}', [CustomerController::class, 'update'])->name('update')->middleware('permission:edit all customers|edit own customers|manage crm');
+        Route::post('/{customer}/assign', [CustomerController::class, 'assignSales'])->name('assign')->middleware('permission:edit all customers|manage crm');
         Route::delete('/{customer}', [CustomerController::class, 'destroy'])->name('destroy')->middleware('permission:delete customers|manage crm');
     });
 
@@ -267,12 +285,12 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::patch('/{task}/complete', [TaskController::class, 'complete'])->name('complete')->middleware('permission:edit all tasks|edit own tasks|manage crm');
     });
 
-    Route::prefix('crm/follow-ups')->name('crm.follow_ups.')->middleware('permission:view crm dashboard|manage crm|view all tasks|view own tasks')->group(function (): void {
+    Route::prefix('crm/follow-ups')->name('crm.follow_ups.')->middleware('permission:view crm dashboard|manage crm|view all follow-ups|view own follow-ups')->group(function (): void {
         Route::get('/', [FollowUpController::class, 'index'])->name('index');
-        Route::post('/', [FollowUpController::class, 'store'])->name('store')->middleware('permission:create tasks|manage crm');
-        Route::put('/{followUp}', [FollowUpController::class, 'update'])->name('update')->middleware('permission:edit all tasks|edit own tasks|manage crm');
-        Route::delete('/{followUp}', [FollowUpController::class, 'destroy'])->name('destroy')->middleware('permission:delete tasks|manage crm');
-        Route::patch('/{followUp}/complete', [FollowUpController::class, 'complete'])->name('complete')->middleware('permission:edit all tasks|edit own tasks|manage crm');
+        Route::post('/', [FollowUpController::class, 'store'])->name('store')->middleware('permission:create follow-ups|manage crm');
+        Route::put('/{followUp}', [FollowUpController::class, 'update'])->name('update')->middleware('permission:edit all follow-ups|edit own follow-ups|manage crm');
+        Route::delete('/{followUp}', [FollowUpController::class, 'destroy'])->name('destroy')->middleware('permission:delete follow-ups|manage crm');
+        Route::patch('/{followUp}/complete', [FollowUpController::class, 'complete'])->name('complete')->middleware('permission:edit all follow-ups|edit own follow-ups|manage crm');
     });
 
     Route::middleware('role:Administrator|Sales Manager|Sales Executive')->group(function (): void {
@@ -301,10 +319,8 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::get('/{offer}', [OfferController::class, 'show'])->name('show');
         Route::get('/{offer}/edit', [OfferController::class, 'edit'])->name('edit')->middleware('permission:manage crm|create offers');
         Route::put('/{offer}', [OfferController::class, 'update'])->name('update')->middleware('permission:manage crm|create offers');
-        Route::delete('/{offer}', [OfferController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm|create offers');
+        Route::delete('/{offer}', [OfferController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm');
     });
-
-    Route::get('crm/search', SearchController::class)->name('crm.search')->middleware('permission:view crm dashboard|manage crm|view reports');
 
     Route::prefix('crm/documents')->name('crm.documents.')->middleware('permission:manage crm|view reports')->group(function (): void {
         Route::get('/', [DocumentController::class, 'index'])->name('index');
@@ -312,13 +328,13 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::delete('/{document}', [DocumentController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm');
     });
 
-    Route::prefix('crm/reports')->name('crm.reports.')->middleware('permission:view crm dashboard|manage crm|view reports')->group(function (): void {
+    Route::prefix('crm/reports')->name('crm.reports.')->middleware('permission:manage crm|view reports')->group(function (): void {
         Route::get('/', [ReportController::class, 'index'])->name('index');
     });
 
     Route::prefix('crm/plans')->name('crm.plans.')->middleware('permission:view crm dashboard|manage crm|view reports')->group(function (): void {
         Route::get('/', [InstallmentPlanController::class, 'index'])->name('index');
-        Route::get('/trash', [InstallmentPlanController::class, 'trash'])->name('trash');
+        Route::get('/trash', [InstallmentPlanController::class, 'trash'])->name('trash')->middleware('permission:manage crm');
         Route::post('/{plan}/restore', [InstallmentPlanController::class, 'restore'])->name('restore')->withTrashed()->middleware('permission:manage crm');
         Route::delete('/{plan}/force-delete', [InstallmentPlanController::class, 'forceDelete'])->name('force-delete')->withTrashed()->middleware('permission:manage crm');
         Route::get('/{plan}', [InstallmentPlanController::class, 'show'])->name('show');
@@ -350,7 +366,7 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
         Route::get('/{reservation}', [ReservationController::class, 'show'])->name('show');
         Route::get('/{reservation}/edit', [ReservationController::class, 'edit'])->name('edit')->middleware('permission:manage crm|create reservations');
         Route::put('/{reservation}', [ReservationController::class, 'update'])->name('update')->middleware('permission:manage crm|create reservations');
-        Route::delete('/{reservation}', [ReservationController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm|create reservations');
+        Route::delete('/{reservation}', [ReservationController::class, 'destroy'])->name('destroy')->middleware('permission:manage crm');
     });
 
     Route::prefix('crm/deals')->name('crm.deals.')->middleware('permission:view crm dashboard|view all deals|view team deals|view own deals|manage crm')->group(function (): void {
@@ -366,31 +382,59 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     });
 
     Route::get('/projects', [ProjectManagementController::class, 'index'])
-        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Data Entry|Owner')
+        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Data Entry|Accountant|Owner')
         ->name('projects.index');
+    Route::get('/projects/{project}/units-report.xlsm', [ProjectManagementController::class, 'exportUnitsReport'])
+        ->middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Data Entry|Accountant|Owner')
+        ->name('projects.units-report');
 
+    // Create/Store — no Owner
     Route::middleware('role:Administrator|Sales Executive|Data Entry')->group(function (): void {
         Route::get('/projects/create', [ProjectManagementController::class, 'create'])->name('projects.create');
         Route::post('/projects', [ProjectManagementController::class, 'store'])->name('projects.store');
+    });
+
+    // Edit/Update — includes Owner and Accountant (view+edit only)
+    Route::middleware('role:Administrator|Sales Executive|Data Entry|Owner|Accountant')->group(function (): void {
         Route::get('/projects/{project}/edit', [ProjectManagementController::class, 'edit'])->name('projects.edit');
         Route::put('/projects/{project}', [ProjectManagementController::class, 'update'])->name('projects.update');
-        Route::delete('/projects/{project}', [ProjectManagementController::class, 'destroy'])->name('projects.destroy');
+    });
+
+    // Delete and unit management — restricted to Admin/Sales Executive/Data Entry/Owner
+    Route::middleware('role:Administrator|Sales Executive|Data Entry|Owner')->group(function (): void {
+        Route::delete('/projects/{project}', [ProjectManagementController::class, 'destroy'])->name('projects.destroy')->middleware('passkey_confirmed');
 
         Route::get('/projects/{project}/units/create', [ProjectManagementController::class, 'createUnit'])->name('projects.units.create');
         Route::post('/projects/{project}/units', [ProjectManagementController::class, 'storeUnit'])->name('projects.units.store');
         Route::get('/projects/{project}/units/{unit}/edit', [ProjectManagementController::class, 'editUnit'])->name('projects.units.edit');
         Route::put('/projects/{project}/units/{unit}', [ProjectManagementController::class, 'updateUnit'])->name('projects.units.update');
-        Route::delete('/projects/{project}/units/{unit}', [ProjectManagementController::class, 'destroyUnit'])->name('projects.units.destroy');
+        Route::delete('/projects/{project}/units/{unit}', [ProjectManagementController::class, 'destroyUnit'])->name('projects.units.destroy')->middleware('passkey_confirmed');
+    });
+
+    // Project layout is viewable by administrators, owners, sales managers, data entry, and accountants.
+    Route::middleware(['role:Administrator|Owner|Sales Manager|Data Entry|Accountant', 'block_mobile_layout'])->group(function (): void {
+        Route::get('/projects/{project}/layout', [ProjectManagementController::class, 'layout'])
+            ->name('projects.layout');
+        Route::get('/projects/{project}/layout-data', [ProjectManagementController::class, 'layoutData'])
+            ->name('projects.layout-data');
+    });
+
+    // Unit status changes remain restricted to administrators and owners.
+    Route::middleware('role:Administrator|Owner')->group(function (): void {
+        Route::post('/projects/{project}/floors/{floor}/units/status', [ProjectManagementController::class, 'updateFloorUnitsStatus'])
+            ->name('projects.floors.units.status');
+        Route::patch('/projects/{project}/units/{unit}/status', [ProjectManagementController::class, 'updateUnitStatus'])
+            ->name('projects.units.status');
     });
 
     Route::prefix('trash')->name('trash.')->middleware('role:Administrator|Sales Manager|Data Entry')->group(function (): void {
         Route::get('/', [DashboardTrashController::class, 'index'])->name('index');
         Route::post('/projects/{project}/restore', [ProjectManagementController::class, 'restoreProject'])->name('projects.restore')->withTrashed();
-        Route::delete('/projects/{project}/force-delete', [ProjectManagementController::class, 'forceDeleteProject'])->name('projects.force-delete')->withTrashed();
+        Route::delete('/projects/{project}/force-delete', [ProjectManagementController::class, 'forceDeleteProject'])->name('projects.force-delete')->withTrashed()->middleware('passkey_confirmed');
         Route::post('/units/{unit}/restore', [ProjectManagementController::class, 'restoreUnit'])->name('units.restore')->withTrashed();
-        Route::delete('/units/{unit}/force-delete', [ProjectManagementController::class, 'forceDeleteUnit'])->name('units.force-delete')->withTrashed();
+        Route::delete('/units/{unit}/force-delete', [ProjectManagementController::class, 'forceDeleteUnit'])->name('units.force-delete')->withTrashed()->middleware('passkey_confirmed');
         Route::post('/buildings/{building}/restore', [ProjectManagementController::class, 'restoreBuilding'])->name('buildings.restore')->withTrashed();
-        Route::delete('/buildings/{building}/force-delete', [ProjectManagementController::class, 'forceDeleteBuilding'])->name('buildings.force-delete')->withTrashed();
+        Route::delete('/buildings/{building}/force-delete', [ProjectManagementController::class, 'forceDeleteBuilding'])->name('buildings.force-delete')->withTrashed()->middleware('passkey_confirmed');
 
         // Generic restore / force-delete for the remaining soft-deleted entities.
         Route::post('/{type}/{id}/restore', [DashboardTrashController::class, 'restore'])
@@ -446,14 +490,13 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     // Personal notification preferences (any signed-in dashboard user).
 
     // Live Status polling (smart auto-refresh)
-    Route::get("live-status/poll", [App\Http\Controllers\Dashboard\LiveStatusController::class, "poll"]);
-    Route::get("live-status/ping", [App\Http\Controllers\Dashboard\LiveStatusController::class, "ping"]);
-
+    Route::get('live-status/poll', [LiveStatusController::class, 'poll']);
+    Route::get('live-status/ping', [LiveStatusController::class, 'ping']);
 
     // Push Notifications
-    Route::post('/push/subscribe', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'store'])->name('push.subscribe');
-    Route::post('/push/unsubscribe', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'destroy'])->name('push.unsubscribe');
-    Route::get('/push/vapid-key', [App\Http\Controllers\Dashboard\PushNotificationController::class, 'publicKey'])->name('push.vapid-key');
+    Route::post('/push/subscribe', [PushNotificationController::class, 'store'])->name('push.subscribe');
+    Route::post('/push/unsubscribe', [PushNotificationController::class, 'destroy'])->name('push.unsubscribe');
+    Route::get('/push/vapid-key', [PushNotificationController::class, 'publicKey'])->name('push.vapid-key');
     Route::put('/settings/notifications', [SettingsController::class, 'updateNotificationPreferences'])
         ->name('settings.notifications.update');
 
@@ -479,13 +522,19 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
 
     // ===== Maintenance & Backups =====
     Route::prefix('maintenance')->name('maintenance.')->middleware('permission:manage settings')->group(function (): void {
-        Route::get('/', [MaintenanceController::class, 'index'])->name('index');
+        Route::match(['GET', 'POST'], '/', [MaintenanceController::class, 'index'])->name('index');
         Route::post('/backup', [MaintenanceController::class, 'createBackup'])->name('backup.create');
+        Route::post('/backup/full', [MaintenanceController::class, 'createFullBackup'])->name('backup.full');
         Route::get('/backups/{file}/download', [MaintenanceController::class, 'download'])->name('backup.download')->where('file', '.*');
         Route::delete('/backups/{file}', [MaintenanceController::class, 'destroy'])->name('backup.destroy')->where('file', '.*');
         Route::post('/backups/{file}/restore', [MaintenanceController::class, 'restore'])->name('backup.restore')->where('file', '.*');
         Route::post('/cache', [MaintenanceController::class, 'clearCache'])->name('cache.clear');
         Route::put('/scheduled-jobs', [MaintenanceController::class, 'updateScheduledJobs'])->name('scheduled-jobs.update');
+    });
+
+    Route::middleware('role:Administrator|Sales Manager|Sales Executive|Viewer|Marketing Manager|Data Entry|Accountant|Owner')->group(function (): void {
+        Route::get('site-plan', [SitePlanController::class, 'sitePlan'])->name('site-plan');
+        Route::get('site-plan/pdf', [SitePlanController::class, 'exportPdf'])->name('site-plan.pdf');
     });
 
     Route::prefix('home-sections')->name('home-sections.')->middleware('permission:manage settings')->group(function (): void {
@@ -515,6 +564,13 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     Route::post('/settings/2fa/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes'])
         ->name('2fa.recovery-codes');
 
+    Route::prefix('departments')->name('departments.')->middleware('permission:manage users')->group(function (): void {
+        Route::get('/', [DepartmentController::class, 'index'])->name('index');
+        Route::post('/', [DepartmentController::class, 'store'])->name('store');
+        Route::put('/{department}', [DepartmentController::class, 'update'])->name('update');
+        Route::delete('/{department}', [DepartmentController::class, 'destroy'])->name('destroy');
+    });
+
     Route::get('/users', [UserManagementController::class, 'index'])
         ->middleware('permission:manage users')
         ->name('users.index');
@@ -526,6 +582,14 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     Route::post('/users', [UserManagementController::class, 'store'])
         ->middleware('permission:manage users')
         ->name('users.store');
+
+    Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
+        ->middleware('permission:manage users')
+        ->name('users.edit');
+
+    Route::put('/users/{user}', [UserManagementController::class, 'update'])
+        ->middleware('permission:manage users')
+        ->name('users.update');
 
     Route::post('/users/{user}/disable', [UserManagementController::class, 'disable'])
         ->middleware('permission:manage users')
@@ -550,6 +614,10 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
     Route::post('/users/{user}/permissions', [UserManagementController::class, 'updatePermissions'])
         ->middleware('permission:manage users')
         ->name('users.permissions');
+
+    Route::post('/users/{user}/password', [UserManagementController::class, 'resetPassword'])
+        ->middleware(['permission:manage users', 'passkey_confirmed'])
+        ->name('users.password');
 
     // ===== Sales Teams =====
     Route::prefix('sales-teams')->name('sales-teams.')->middleware('permission:manage teams')->group(function (): void {
@@ -588,11 +656,16 @@ Route::middleware(['auth', 'active', 'force_logout', '2fa'])->prefix('real-state
 });
 
 // Facebook Messenger webhook
-Route::get('/webhook/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'verify'])->name('webhook.facebook.verify');
-Route::post('/webhook/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'handle'])->name('webhook.facebook.handle')
+Route::get('/webhook/facebook', [FacebookWebhookController::class, 'verify'])->name('webhook.facebook.verify');
+Route::post('/webhook/facebook', [FacebookWebhookController::class, 'handle'])->name('webhook.facebook.handle')
     ->middleware('throttle:120,1');
 
 // Evolution API WhatsApp webhook (incoming messages)
 Route::post('/webhook/whatsapp/evolution', [WhatsAppWebhookController::class, 'handle'])
     ->middleware('throttle:120,1')
     ->name('webhook.whatsapp.evolution');
+
+// n8n → Laravel: Gemini AI usage logging
+Route::post('/webhook/gemini/usage', [GeminiUsageController::class, 'store'])
+    ->middleware('throttle:120,1')
+    ->name('webhook.gemini.usage');

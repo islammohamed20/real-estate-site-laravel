@@ -26,6 +26,8 @@ class InstallmentPlanController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', InstallmentPlan::class);
+
         $plans = InstallmentPlan::query()
             ->with(['customer', 'unit.project', 'unit.building', 'unit.floor', 'offer'])
             ->latest('id')
@@ -42,6 +44,8 @@ class InstallmentPlanController extends Controller
 
     public function show(InstallmentPlan $plan): View
     {
+        $this->authorize('view', $plan);
+
         $plan->load(['customer', 'unit.project', 'unit.building', 'unit.floor', 'offer', 'items', 'creator', 'lead']);
 
         $items = $plan->items()->orderBy('installment_number')->get();
@@ -56,6 +60,7 @@ class InstallmentPlanController extends Controller
     public function updateItem(InstallmentPlan $plan, InstallmentPlanItem $item, Request $request): RedirectResponse
     {
         $this->authorize('update', $plan);
+        $this->ensureItemBelongsToPlan($plan, $item);
 
         $validated = $request->validate([
             'paid_amount' => ['required', 'numeric', 'min:0', 'max:'.(float) $item->amount],
@@ -105,6 +110,7 @@ class InstallmentPlanController extends Controller
     public function fullPay(InstallmentPlan $plan, InstallmentPlanItem $item): RedirectResponse
     {
         $this->authorize('update', $plan);
+        $this->ensureItemBelongsToPlan($plan, $item);
 
         $remaining = max(0, (float) $item->amount - (float) $item->paid_amount);
 
@@ -155,6 +161,9 @@ class InstallmentPlanController extends Controller
 
     public function receipt(InstallmentPlan $plan, InstallmentPlanItem $item): Response
     {
+        $this->authorize('view', $plan);
+        $this->ensureItemBelongsToPlan($plan, $item);
+
         $plan->load(['customer', 'unit.project', 'unit.building', 'unit.floor', 'creator']);
 
         $company = CompanyProfile::query()->first();
@@ -261,6 +270,8 @@ class InstallmentPlanController extends Controller
 
     public function pdf(InstallmentPlan $plan): Response
     {
+        $this->authorize('view', $plan);
+
         $schedule = $plan->schedule_json ?? [];
         $finalPrice = (float) $plan->final_price;
         $downPayment = (float) $plan->down_payment;
@@ -375,6 +386,11 @@ class InstallmentPlanController extends Controller
                 'currency_code' => $plan->currency_code,
             ],
         ]);
+    }
+
+    private function ensureItemBelongsToPlan(InstallmentPlan $plan, InstallmentPlanItem $item): void
+    {
+        abort_unless($item->installment_plan_id === $plan->id, 404);
     }
 
     private function imageDataUri(?string $url): ?string

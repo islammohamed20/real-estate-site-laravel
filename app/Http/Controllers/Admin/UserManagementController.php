@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class UserManagementController extends Controller
     public function index(): View
     {
         return view('users.index', [
-            'users' => User::query()->with(['roles', 'permissions'])->latest()->paginate(20),
+            'users' => User::query()->with(['roles.permissions', 'permissions'])->latest()->paginate(20),
             'roleOptions' => Role::query()->orderBy('name')->pluck('name', 'name'),
             'permissionGroups' => $this->permissionGroups(),
         ]);
@@ -30,6 +31,9 @@ class UserManagementController extends Controller
             'roleOptions' => Role::query()->orderBy('name')->pluck('name', 'name'),
             'permissionGroups' => $this->permissionGroups(),
             'rolePermissions' => $this->rolePermissions(),
+            'dashboardSectionOptions' => User::DASHBOARD_SECTIONS,
+            'selectedDashboardSections' => array_keys(User::DASHBOARD_SECTIONS),
+            'departmentOptions' => Department::query()->orderByDesc('is_active')->orderBy('name')->get(),
         ]);
     }
 
@@ -38,18 +42,32 @@ class UserManagementController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', 'exists:roles,name'],
             'is_active' => ['boolean'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
+            'dashboard_sections' => ['nullable', 'array'],
+            'dashboard_sections.*' => ['string', 'in:'.implode(',', array_keys(User::DASHBOARD_SECTIONS))],
         ]);
 
+        $department = isset($validated['department_id'])
+            ? Department::query()->find($validated['department_id'])
+            : null;
         $user = User::query()->create([
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'job_title' => $validated['job_title'] ?? null,
+            'department' => $department?->name ?? ($validated['department'] ?? null),
+            'department_id' => $department?->id,
             'password' => $validated['password'],
             'is_active' => $validated['is_active'] ?? true,
+            'dashboard_sections' => array_values(array_unique($validated['dashboard_sections'] ?? [])),
             'email_verified_at' => now(),
         ]);
 
@@ -57,6 +75,75 @@ class UserManagementController extends Controller
         $user->syncPermissions($validated['permissions'] ?? []);
 
         return redirect()->route('dashboard.users.index')->with('status', __('User created successfully.'));
+    }
+
+    public function edit(User $user): View
+    {
+        return view('users.form', [
+            'user' => $user->load(['roles', 'permissions']),
+            'roleOptions' => Role::query()->orderBy('name')->pluck('name', 'name'),
+            'permissionGroups' => $this->permissionGroups(),
+            'rolePermissions' => $this->rolePermissions(),
+            'dashboardSectionOptions' => User::DASHBOARD_SECTIONS,
+            'selectedDashboardSections' => $user->dashboard_sections ?? array_keys(User::DASHBOARD_SECTIONS),
+            'departmentOptions' => Department::query()->orderByDesc('is_active')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'role' => ['required', 'string', 'exists:roles,name'],
+            'is_active' => ['boolean'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
+            'dashboard_sections' => ['nullable', 'array'],
+            'dashboard_sections.*' => ['string', 'in:'.implode(',', array_keys(User::DASHBOARD_SECTIONS))],
+        ]);
+
+        if ($this->isProtectedUser($user) && (
+            strtolower($validated['email']) !== strtolower($user->email)
+            || $validated['role'] !== 'Administrator'
+            || ! ($validated['is_active'] ?? false)
+        )) {
+            return back()->withErrors([
+                'user' => __('The main administrator account cannot have its email, role, or active status changed.'),
+            ])->withInput();
+        }
+
+        $department = isset($validated['department_id'])
+            ? Department::query()->find($validated['department_id'])
+            : null;
+        $data = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'job_title' => $validated['job_title'] ?? null,
+            'department' => $department?->name ?? ($validated['department'] ?? null),
+            'department_id' => $department?->id,
+            'is_active' => $validated['is_active'] ?? false,
+            'dashboard_sections' => $this->isProtectedUser($user)
+                ? array_keys(User::DASHBOARD_SECTIONS)
+                : array_values(array_unique($validated['dashboard_sections'] ?? [])),
+        ];
+        if (filled($validated['password'] ?? null)) {
+            $data['password'] = $validated['password'];
+        }
+
+        $user->update($data);
+        if (! $this->isProtectedUser($user)) {
+            $user->syncRoles([$validated['role']]);
+            $user->syncPermissions($validated['permissions'] ?? []);
+        }
+
+        return redirect()->route('dashboard.users.index')->with('status', __('User updated successfully.'));
     }
 
     public function updateRole(Request $request, User $user): RedirectResponse
@@ -120,6 +207,17 @@ class UserManagementController extends Controller
         $user->syncPermissions($validated['permissions'] ?? []);
 
         return back()->with('status', __('Permissions updated successfully.'));
+    }
+
+    public function resetPassword(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->update(['password' => $validated['password']]);
+
+        return back()->with('status', __('Password reset for :name.', ['name' => $user->name]));
     }
 
     /**

@@ -1,6 +1,8 @@
 <!doctype html>
 @php
     $currentRoute = request()->route()?->getName();
+    $dashboardUser = auth()->user();
+    $showsSection = fn (string $section): bool => $dashboardUser?->hasDashboardSection($section) ?? true;
     $isCrmRoute = $currentRoute !== null && str_starts_with($currentRoute, 'dashboard.crm');
     $isCrmActive = fn ($key) => $currentRoute !== null && str_starts_with($currentRoute, 'dashboard.crm.' . $key);
     $crmModules = [
@@ -42,7 +44,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0b1120">
+    <meta name="theme-color" content="#051123">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -59,12 +61,12 @@
             try {
                 const theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
                 if (theme === 'dark') document.documentElement.classList.add('dark');
-                document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#0b1120' : '#f8fafc');
+                document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#051123' : '#f8fafc');
             } catch (e) {}
         })();
     </script>
     <style>body { font-family: 'Cairo', sans-serif !important; }</style>
-    @vite(['resources/css/app.css', 'resources/css/dashboard.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/dashboard.css', 'resources/js/app.js', 'resources/js/dashboard-history-fix.js'])
 </head>
 <body class="dash-ui min-h-full bg-slate-950 text-slate-100" x-data="{
     drawerOpen: false,
@@ -127,10 +129,13 @@
             <div>
                 <p x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="overflow-hidden whitespace-nowrap px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] mb-4">{{ __('Menu') }}</p>
                 <nav class="space-y-1">
+                    @if($showsSection('dashboard'))
                     <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.home' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Dashboard') }}' : ''" href="{{ route('dashboard.home') }}">
                         <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8"/><path d="M9 22V12h6v10" stroke-width="1.8"/></svg>
                         <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Dashboard') }}</span>
                     </a>
+                    @endif
+                    @if($showsSection('crm'))
                     <div class="relative">
                         <button type="button" @click="if(!sidebarCollapsed) crmSubmenuOpen = !crmSubmenuOpen" @mouseenter="openCrmFlyout($el)" @mouseleave="closeCrmFlyout()" :title="sidebarCollapsed ? '{{ __('CRM') }}' : ''" class="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition {{ $isCrmRoute ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="1.8"/><circle cx="9" cy="7" r="4" stroke-width="1.8"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="1.8"/></svg>
@@ -149,6 +154,8 @@
                         </div>
 
                     </div>
+                    @endif
+                    @if($showsSection('sales'))
                     @canany(['manage teams', 'view reports', 'manage settings'])
                     <div class="relative">
                         <button type="button" @click="if(!sidebarCollapsed) salesSubmenuOpen = !salesSubmenuOpen" @mouseenter="openSalesFlyout($el)" @mouseleave="closeSalesFlyout()" :title="sidebarCollapsed ? '{{ __('Sales Team') }}' : ''" class="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition {{ $isSalesRoute ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
@@ -170,44 +177,62 @@
                         </div>
                     </div>
                     @endcanany
+                    @endif
+                    @if($showsSection('projects'))
                     <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ in_array($currentRoute, ['dashboard.projects.index', 'dashboard.projects.create', 'dashboard.projects.edit', 'dashboard.projects.units.create', 'dashboard.projects.units.edit']) ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Projects') }}' : ''" href="{{ route('dashboard.projects.index') }}">
                         <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7M4 21V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v17" stroke-width="1.8"/></svg>
                         <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Projects') }}</span>
                     </a>
+                    @endif
                 </nav>
             </div>
 
-            @if(auth()->user()->can('view reports') || auth()->user()->can('manage users') || auth()->user()->can('manage settings') || auth()->user()->hasAnyRole(['Administrator', 'Sales Manager']))
+            @if(($showsSection('reports') || $showsSection('analytics') || $showsSection('trash') || $showsSection('users') || $showsSection('banners') || $showsSection('settings')) && (auth()->user()->can('view reports') || auth()->user()->can('manage users') || auth()->user()->can('manage settings') || auth()->user()->hasAnyRole(['Administrator', 'Sales Manager', 'Data Entry'])))
             <div>
                 <p x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="overflow-hidden whitespace-nowrap px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] mb-4">{{ __('Administration') }}</p>
                 <nav class="space-y-1">
                     @can('view reports')
+                        @if($showsSection('reports'))
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.reports.index' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Reports') }}' : ''" href="{{ route('dashboard.reports.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" stroke-width="1.8"/><path d="M22 12A10 10 0 0 0 12 2v10z" stroke-width="1.8"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Reports') }}</span>
                         </a>
+                        @endif
+                        @if($showsSection('analytics'))
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.analytics.index' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Site Analytics') }}' : ''" href="{{ route('dashboard.analytics.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 14l4-4 3 3 5-6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Site Analytics') }}</span>
                         </a>
+                        @endif
                     @endcan
+                    @if($showsSection('trash'))
                     @hasanyrole(['Administrator', 'Sales Manager', 'Data Entry'])
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ str_starts_with((string) $currentRoute, 'dashboard.trash') ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Trash') }}' : ''" href="{{ route('dashboard.trash.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8" stroke-linecap="round"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Trash') }}</span>
                         </a>
                     @endhasanyrole
+                    @endif
+                    @if($showsSection('users'))
                     @can('manage users')
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.users.index' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Users') }}' : ''" href="{{ route('dashboard.users.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-width="1.8"/><circle cx="9" cy="7" r="4" stroke-width="1.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="1.8"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Users') }}</span>
                         </a>
+                        <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.departments.index' ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Departments') }}' : ''" href="{{ route('dashboard.departments.index') }}">
+                            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M5 21V5h14v16M9 9h2M13 9h2M9 13h2M13 13h2" stroke-width="1.8" stroke-linecap="round"/></svg>
+                            <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Departments') }}</span>
+                        </a>
                     @endcan
+                    @endif
                     @can('manage settings')
+                        @if($showsSection('banners'))
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ $currentRoute === 'dashboard.banners.index' || str_starts_with((string) $currentRoute, 'dashboard.banners') ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Banners') }}' : ''" href="{{ route('dashboard.banners.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" stroke-width="1.8"/><path d="m21 15-5-5L5 21" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Banners') }}</span>
                         </a>
+                        @endif
+                        @if($showsSection('settings'))
                         <a class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition {{ str_starts_with((string) $currentRoute, 'dashboard.home-sections') ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''" :title="sidebarCollapsed ? '{{ __('Homepage Sections') }}' : ''" href="{{ route('dashboard.home-sections.index') }}">
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 22V12h6v10" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Homepage Sections') }}</span>
@@ -224,6 +249,7 @@
                             <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2" stroke-width="1.8"/><path d="m3 7 9 6 9-6" stroke-width="1.8" stroke-linejoin="round"/></svg>
                             <span x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="inline-block overflow-hidden whitespace-nowrap transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">{{ __('Email Templates') }}</span>
                         </a>
+                        @endif
                     @endcan
                 </nav>
             </div>
@@ -239,6 +265,7 @@
                 </nav>
             </div>
 
+            @if($showsSection('tools'))
             <div>
                 <p x-cloak :class="sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-52 opacity-100'" class="overflow-hidden whitespace-nowrap px-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] mb-4">{{ __('Tools') }}</p>
                 <nav class="space-y-1">
@@ -248,6 +275,7 @@
                     </a>
                 </nav>
             </div>
+            @endif
         </div>
         <div class="p-3.5 mt-auto shrink-0 border-t border-white/5 space-y-2 bg-slate-950/40">
             <button type="button" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '{{ __('Expand') }}' : '{{ __('Collapse') }}'" class="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/5 py-3 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white transition">
@@ -455,36 +483,51 @@
             </div>
 
             <div class="mt-3 flex-1 min-h-0 overflow-y-auto space-y-2 py-2 pr-1 sidebar-scroll overscroll-contain pb-8">
+                @if($showsSection('dashboard'))
                 <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.home' ? 'is-active' : '' }}" href="{{ route('dashboard.home') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8"/><path d="M9 22V12h6v10" stroke-width="1.8"/></svg>{{ __('Dashboard') }}</span><span>→</span>
                 </a>
+                @endif
+                @if($showsSection('projects'))
                 <a class="mobile-drawer__link {{ in_array($currentRoute, ['dashboard.projects.index', 'dashboard.projects.create', 'dashboard.projects.edit', 'dashboard.projects.units.create', 'dashboard.projects.units.edit']) ? 'is-active' : '' }}" href="{{ route('dashboard.projects.index') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7M4 21V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v17" stroke-width="1.8"/></svg>{{ __('Projects') }}</span><span>→</span>
                 </a>
+                @endif
+                @if($showsSection('crm'))
                 <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'dashboard.crm') ? 'is-active' : '' }}" href="{{ route('dashboard.crm.index') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke-width="1.8"/><circle cx="9" cy="7" r="4" stroke-width="1.8"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="1.8"/></svg>{{ __('CRM') }}</span><span>→</span>
                 </a>
                 <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.crm.deals.index' ? 'is-active' : '' }}" href="{{ route('dashboard.crm.deals.index') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9z" stroke-width="1.8"/><path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2v16z" stroke-width="1.8"/></svg>{{ __('Deals') }}</span><span>→</span>
                 </a>
+                @endif
                 @can('view reports')
+                    @if($showsSection('reports'))
                     <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.reports.index' ? 'is-active' : '' }}" href="{{ route('dashboard.reports.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" stroke-width="1.8"/><path d="M22 12A10 10 0 0 0 12 2v10z" stroke-width="1.8"/></svg>{{ __('Reports & Insights') }}</span><span>→</span>
                     </a>
+                    @endif
+                    @if($showsSection('analytics'))
                     <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.analytics.index' ? 'is-active' : '' }}" href="{{ route('dashboard.analytics.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18" stroke-width="1.8"/><path d="M7 14l4-4 3 3 5-6" stroke-width="1.8"/></svg>{{ __('Site Analytics') }}</span><span>→</span>
                     </a>
+                    @endif
                 @endcan
                 @can('manage settings')
+                    @if($showsSection('banners'))
                     <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'dashboard.banners') ? 'is-active' : '' }}" href="{{ route('dashboard.banners.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" stroke-width="1.8"/><path d="m21 15-5-5L5 21" stroke-width="1.8"/></svg>{{ __('Banners') }}</span><span>→</span>
                     </a>
+                    @endif
                 @endcan
+                @if($showsSection('trash'))
                 @hasanyrole(['Administrator', 'Sales Manager', 'Data Entry'])
                     <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'dashboard.trash') ? 'is-active' : '' }}" href="{{ route('dashboard.trash.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8"/></svg>{{ __('Trash') }}</span><span>→</span>
                     </a>
                 @endhasanyrole
+                @endif
+                @if($showsSection('sales'))
                 @canany(['manage teams', 'view reports', 'manage settings'])
                     <p class="px-1 pt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{{ __('Sales Team') }}</p>
                     @foreach ($salesModules as $module)
@@ -495,11 +538,18 @@
                         @endcan
                     @endforeach
                 @endcanany
+                @endif
+                @if($showsSection('users'))
                 @can('manage users')
                     <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.users.index' ? 'is-active' : '' }}" href="{{ route('dashboard.users.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-width="1.8"/><circle cx="9" cy="7" r="4" stroke-width="1.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 0 0 7.75" stroke-width="1.8"/></svg>{{ __('Users & Permissions') }}</span><span>→</span>
                     </a>
+                    <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.departments.index' ? 'is-active' : '' }}" href="{{ route('dashboard.departments.index') }}">
+                        <span class="mobile-drawer__link-content">{{ __('Departments') }}</span><span>→</span>
+                    </a>
                 @endcan
+                @endif
+                @if($showsSection('settings'))
                 @can('manage settings')
                     <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'dashboard.home-sections') ? 'is-active' : '' }}" href="{{ route('dashboard.home-sections.index') }}">
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8"/><path d="M9 22V12h6v10" stroke-width="1.8"/></svg>{{ __('Homepage Sections') }}</span><span>→</span>
@@ -514,15 +564,18 @@
                         <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2" stroke-width="1.8"/><path d="m3 7 9 6 9-6" stroke-width="1.8"/></svg>{{ __('Email Templates') }}</span><span>→</span>
                     </a>
                 @endcan
+                @endif
                 <a class="mobile-drawer__link {{ $currentRoute === 'dashboard.profile.index' ? 'is-active' : '' }}" href="{{ route('dashboard.profile.index') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-width="1.8"/><circle cx="9" cy="7" r="4" stroke-width="1.8"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-width="1.8"/></svg>{{ __('My Profile') }}</span><span>→</span>
                 </a>
                 <a class="mobile-drawer__link" href="{{ route('home') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8"/><path d="M9 22V12h6v10" stroke-width="1.8"/></svg>{{ __('Public Website') }}</span><span>→</span>
                 </a>
+                @if($showsSection('tools'))
                 <a class="mobile-drawer__link" href="{{ route('dashboard.installments.index') }}">
                     <span class="mobile-drawer__link-content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2" stroke-width="1.8"/><path d="M8 6h8M8 10h8M8 14h8M8 18h8" stroke-width="1.8"/></svg>{{ __('Calculator') }}</span><span>→</span>
                 </a>
+                @endif
                 <div class="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
                     <span class="text-sm font-semibold text-slate-300">{{ __('Language') }}</span>
                     @include('partials.language-switcher')

@@ -299,6 +299,168 @@
             </div>
         </section>
 
+        {{-- ===== AI Usage Monitor (Gemini WhatsApp Agent) ===== --}}
+        @php
+            $aiSeries = [];
+            for ($i = 13; $i >= 0; $i--) {
+                $date = now()->subDays($i)->toDateString();
+                $aiSeries[] = ['label' => now()->subDays($i)->format('d/m'), 'total' => (int) ($aiDaily[$date] ?? 0)];
+            }
+            $maxAi = max(1, max(array_column($aiSeries, 'total')));
+            $aiPct = fn($part) => $aiTotals['total_tokens'] > 0 ? round($part / $aiTotals['total_tokens'] * 100) : 0;
+        @endphp
+
+        <section class="app-card app-card--gradient space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-400">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a3 3 0 0 1 3 3c0 1.31-.83 2.42-2 2.83V9h3a4 4 0 0 1 4 4v.17A3 3 0 0 1 22 16a3 3 0 0 1-2 2.83V19a4 4 0 0 1-4 4h-3v-.17A3 3 0 0 1 12 21a3 3 0 0 1-2 2.83V23H7a4 4 0 0 1-4-4v-.17A3 3 0 0 1 1 16a3 3 0 0 1 2-2.83V13a4 4 0 0 1 4-4h3V7.83A3 3 0 0 1 9 5a3 3 0 0 1 3-3z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    <div>
+                        <h2 class="text-lg font-semibold text-white">{{ __('AI Usage Monitor') }}</h2>
+                        <p class="text-xs text-slate-500">{{ __('Gemini AI consumption for the WhatsApp agent — last 14 days') }}</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="badge badge-brand">{{ $aiTotals['requests'] }} {{ __('requests') }}</span>
+                    <span class="badge badge-success">{{ $aiTotals['successful'] }} {{ __('ok') }}</span>
+                    @if ($aiTotals['failed'] > 0)
+                        <span class="badge badge-danger">{{ $aiTotals['failed'] }} {{ __('failed') }}</span>
+                    @endif
+                </div>
+            </div>
+
+            {{-- AI KPI cards --}}
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Total Tokens') }}</p>
+                    <p class="mt-1 text-2xl font-bold text-white">{{ number_format($aiTotals['total_tokens']) }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Unique Customers') }}</p>
+                    <p class="mt-1 text-2xl font-bold text-emerald-400">{{ number_format($aiTotals['unique_customers']) }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Avg Latency') }}</p>
+                    <p class="mt-1 text-2xl font-bold text-amber-400">{{ $aiTotals['avg_latency'] > 0 ? number_format($aiTotals['avg_latency']) . 'ms' : '—' }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{{ __('Success Rate') }}</p>
+                    <p class="mt-1 text-2xl font-bold text-indigo-400">{{ $aiTotals['requests'] > 0 ? round($aiTotals['successful'] / $aiTotals['requests'] * 100) : 100 }}%</p>
+                </div>
+            </div>
+
+            {{-- Token breakdown bars --}}
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="rounded-xl border border-white/5 bg-slate-950/40 p-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">{{ __('Prompt (input)') }}</span>
+                        <span class="font-bold text-white tabular-nums">{{ number_format($aiTotals['prompt_tokens']) }}</span>
+                    </div>
+                    <div class="mt-2 h-1.5 rounded-full bg-white/5">
+                        <div class="h-full rounded-full bg-indigo-500" style="width: {{ $aiPct($aiTotals['prompt_tokens']) }}%"></div>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-white/5 bg-slate-950/40 p-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">{{ __('Output (reply)') }}</span>
+                        <span class="font-bold text-white tabular-nums">{{ number_format($aiTotals['output_tokens']) }}</span>
+                    </div>
+                    <div class="mt-2 h-1.5 rounded-full bg-white/5">
+                        <div class="h-full rounded-full bg-emerald-500" style="width: {{ $aiPct($aiTotals['output_tokens']) }}%"></div>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-white/5 bg-slate-950/40 p-3">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">{{ __('Thoughts (internal)') }}</span>
+                        <span class="font-bold text-white tabular-nums">{{ number_format($aiTotals['thoughts_tokens']) }}</span>
+                    </div>
+                    <div class="mt-2 h-1.5 rounded-full bg-white/5">
+                        <div class="h-full rounded-full bg-amber-500" style="width: {{ $aiPct($aiTotals['thoughts_tokens']) }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Daily AI chart --}}
+            <div class="space-y-3">
+                <h3 class="text-sm font-semibold text-slate-300">{{ __('Daily AI Requests') }}</h3>
+                <div class="flex h-32 items-end gap-1.5">
+                    @foreach ($aiSeries as $day)
+                        <div class="group relative flex-1">
+                            <div class="mx-auto w-full rounded-t-lg bg-indigo-500/70 transition group-hover:bg-indigo-400" style="height: {{ max(4, round(($day['total'] / $maxAi) * 120)) }}px" title="{{ $day['label'] }}: {{ $day['total'] }}"></div>
+                            <div class="absolute -top-8 left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-[10px] font-bold text-white shadow-lg group-hover:block">{{ $day['total'] }}</div>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500">
+                    @foreach ($aiSeries as $day)
+                        <span>{{ $day['label'] }}</span>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Top customers + recent interactions --}}
+            <div class="grid gap-4 lg:grid-cols-2">
+                @if ($aiTopCustomers->isNotEmpty())
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-semibold text-slate-300">{{ __('Top Customers') }}</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-slate-300">
+                                <thead class="border-b border-white/10 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                                    <tr>
+                                        <th class="pb-2 pr-3">{{ __('Phone') }}</th>
+                                        <th class="pb-2 pr-3">{{ __('Name') }}</th>
+                                        <th class="pb-2 pr-3 text-right">{{ __('Req') }}</th>
+                                        <th class="pb-2 pr-3 text-right">{{ __('Tokens') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    @foreach ($aiTopCustomers as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 font-mono">{{ $row->phone }}</td>
+                                            <td class="py-2 pr-3">{{ $row->push_name ?? '—' }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row->requests) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format((int) $row->total_tokens) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-300">{{ __('Recent AI Interactions') }}</h3>
+                    @if ($aiRecentLogs->isEmpty())
+                        <p class="text-sm text-slate-500">{{ __('No AI activity yet.') }}</p>
+                    @else
+                        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            @foreach ($aiRecentLogs as $log)
+                                <div class="rounded-xl border border-white/5 bg-slate-950/40 p-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="rounded px-1.5 py-0.5 text-[9px] font-bold {{ $log->success ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400' }}">{{ $log->success ? __('OK') : __('ERR') }}</span>
+                                            <span class="font-mono text-[11px] text-slate-300">{{ $log->phone ?? '—' }}</span>
+                                        </div>
+                                        <span class="text-[10px] text-slate-500">{{ $log->created_at->diffForHumans() }}</span>
+                                    </div>
+                                    <p class="mt-1.5 text-[11px] text-slate-300"><span class="font-bold text-brand-400">{{ __('Q:') }}</span> {{ \Illuminate\Support\Str::limit($log->customer_message ?? '—', 120) }}</p>
+                                    <p class="mt-0.5 text-[11px] text-slate-300"><span class="font-bold text-indigo-400">{{ __('A:') }}</span> {{ \Illuminate\Support\Str::limit($log->ai_reply ?? '—', 150) }}</p>
+                                    <div class="mt-1.5 flex flex-wrap gap-2 text-[9px] text-slate-400">
+                                        <span>{{ number_format($log->total_tokens) }} tokens</span>
+                                        <span>↓{{ number_format($log->prompt_tokens) }}</span>
+                                        <span>↑{{ number_format($log->output_tokens) }}</span>
+                                        <span>💭{{ number_format($log->thoughts_tokens) }}</span>
+                                        @if ($log->latency_ms)<span>⏱{{ number_format($log->latency_ms) }}ms</span>@endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </section>
+
         {{-- Audit logs --}}
         <section class="app-card app-card--gradient space-y-4">
             <div class="flex items-center justify-between">

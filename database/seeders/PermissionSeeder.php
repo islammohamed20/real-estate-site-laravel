@@ -189,6 +189,7 @@ class PermissionSeeder extends Seeder
             'view own follow-ups',
             'create follow-ups',
             'edit own follow-ups',
+            'receive notification.followups',
         ]);
 
         $viewer->syncPermissions([

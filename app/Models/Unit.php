@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\UnitStatus;
 use App\Models\Traits\TracksDeletedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,9 @@ class Unit extends Model
         'featured',
         'hidden_from_website',
         'sort_order',
+        'grid_row',
+        'grid_col',
+        'position_in_grid',
     ];
 
     protected function casts(): array
@@ -73,7 +77,15 @@ class Unit extends Model
             'status' => UnitStatus::class,
             'featured' => 'boolean',
             'hidden_from_website' => 'boolean',
+            'position_in_grid' => 'integer',
         ];
+    }
+
+    public function scopePubliclyVisible(Builder $query): Builder
+    {
+        return $query
+            ->where('hidden_from_website', false)
+            ->whereIn('status', [UnitStatus::Available->value, UnitStatus::Reserved->value, UnitStatus::Sold->value]);
     }
 
     public function project(): BelongsTo
@@ -109,5 +121,24 @@ class Unit extends Model
     public function installmentPlans(): HasMany
     {
         return $this->hasMany(InstallmentPlan::class);
+    }
+
+    /**
+     * Human-readable floor label for use in PDFs and views.
+     * Returns "Ground Floor" or "Floor N" based on the linked floor's number.
+     */
+    public function getFloorLabelAttribute(): ?string
+    {
+        $floor = $this->floor;
+
+        if (! $floor) {
+            return null;
+        }
+
+        if ($floor->number === 0 || $floor->number === null) {
+            return __('Ground Floor');
+        }
+
+        return __('Floor :number', ['number' => $floor->number]);
     }
 }

@@ -36,6 +36,28 @@ class DataEntryTest extends TestCase
             ->assertOk();
     }
 
+    public function test_data_entry_can_open_project_3d_layout(): void
+    {
+        $project = Project::factory()->create();
+        $building = Building::factory()->create(['project_id' => $project->id]);
+        $floor = Floor::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'number' => 1,
+        ]);
+        Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'floor_id' => $floor->id,
+            'unit_number' => '101',
+        ]);
+
+        $this->actingAs($this->dataEntry)
+            ->get(route('dashboard.projects.layout', $project))
+            ->assertOk()
+            ->assertViewIs('dashboard.projects.layout');
+    }
+
     public function test_data_entry_can_create_project(): void
     {
         $this->actingAs($this->dataEntry)
@@ -43,6 +65,7 @@ class DataEntryTest extends TestCase
                 'name' => 'Data Entry Project',
                 'code' => 'DEP',
                 'price_per_meter' => 10000,
+                'max_installment_years' => 4,
                 'location' => 'Cairo',
                 'city' => 'Cairo',
                 'country' => 'Egypt',
@@ -59,6 +82,7 @@ class DataEntryTest extends TestCase
         $project = Project::factory()->create();
 
         $this->actingAs($this->dataEntry)
+            ->withSession(['passkey_confirmed_at' => now()])
             ->from(route('dashboard.projects.index'))
             ->delete(route('dashboard.projects.destroy', $project))
             ->assertRedirect();
@@ -80,6 +104,7 @@ class DataEntryTest extends TestCase
         $project = Project::factory()->create();
 
         $this->actingAs($this->dataEntry)
+            ->withSession(['passkey_confirmed_at' => now()])
             ->delete(route('dashboard.projects.destroy', $project));
 
         $this->actingAs($this->dataEntry)
@@ -101,6 +126,7 @@ class DataEntryTest extends TestCase
         ]);
 
         $this->actingAs($this->dataEntry)
+            ->withSession(['passkey_confirmed_at' => now()])
             ->delete(route('dashboard.projects.units.destroy', [$project, $unit]))
             ->assertRedirect();
 
@@ -123,6 +149,7 @@ class DataEntryTest extends TestCase
         $project = Project::factory()->create();
 
         $this->actingAs($otherUser)
+            ->withSession(['passkey_confirmed_at' => now()])
             ->delete(route('dashboard.projects.destroy', $project));
 
         $this->actingAs($this->dataEntry)

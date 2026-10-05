@@ -24,7 +24,11 @@ class InstallmentTemplateRepository extends BaseRepository implements Installmen
 
     public function all(): Collection
     {
-        return $this->query()->orderByDesc('is_default')->orderBy('name')->get();
+        return $this->query()
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
     }
 
     public function find(int $id): ?InstallmentTemplate

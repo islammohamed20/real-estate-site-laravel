@@ -9,13 +9,22 @@
                     <h1 class="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">{{ __('Maintenance Tools') }}</h1>
                     <p class="mt-2 text-sm text-slate-400">{{ __('Database backups, cache management, and system health.') }}</p>
                 </div>
-                <form method="POST" action="{{ route('dashboard.maintenance.backup.create') }}">
-                    @csrf
-                    <button type="submit" class="app-button shrink-0">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        {{ __('Backup now') }}
-                    </button>
-                </form>
+                <div class="flex flex-wrap gap-2 shrink-0">
+                    <form method="POST" action="{{ route('dashboard.maintenance.backup.create') }}" data-no-ajax>
+                        @csrf
+                        <button type="submit" class="app-button shrink-0">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke-linecap="round"/><path d="M21 3v6h-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            {{ __('Backup now') }}
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('dashboard.maintenance.backup.full') }}" data-no-ajax onsubmit="return confirm('{{ __('Create a full backup? It includes the database and uploaded files.') }}')">
+                        @csrf
+                        <button type="submit" class="app-button--ghost shrink-0">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/><path d="M7 4v16M17 4v16" stroke-linecap="round"/></svg>
+                            {{ __('Full backup') }}
+                        </button>
+                    </form>
+                </div>
             </div>
         </section>
 
@@ -76,7 +85,7 @@
             @if ($backups->isEmpty())
                 <div class="py-12 text-center">
                     <p class="text-sm text-slate-400">{{ __('No backups yet. Create your first one now — a daily automatic backup is also scheduled.') }}</p>
-                    <form method="POST" action="{{ route('dashboard.maintenance.backup.create') }}" class="mt-4">
+                    <form method="POST" action="{{ route('dashboard.maintenance.backup.create') }}" class="mt-4" data-no-ajax>
                         @csrf
                         <button type="submit" class="app-button inline-flex">{{ __('Backup now') }}</button>
                     </form>
@@ -106,14 +115,16 @@
                                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                                 {{ __('Download') }}
                                             </a>
-                                            <form method="POST" action="{{ route('dashboard.maintenance.backup.restore', $backup['name']) }}" class="contents" onsubmit="return confirm('{{ __('Restore this backup? The current database will be replaced (a safety backup is taken first).') }}')">
-                                                @csrf
-                                                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20">
-                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                                    {{ __('Restore') }}
-                                                </button>
-                                            </form>
-                                            <form method="POST" action="{{ route('dashboard.maintenance.backup.destroy', $backup['name']) }}" class="contents" onsubmit="return confirm('{{ __('Delete this backup file?') }}')">
+                                            @if (str_ends_with($backup['name'], '.sql.gz'))
+                                                <form method="POST" action="{{ route('dashboard.maintenance.backup.restore', $backup['name']) }}" class="contents" data-no-ajax onsubmit="return confirm('{{ __('Restore this backup? The current database will be replaced (a safety backup is taken first).') }}')">
+                                                    @csrf
+                                                    <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20">
+                                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                        {{ __('Restore') }}
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            <form method="POST" action="{{ route('dashboard.maintenance.backup.destroy', $backup['name']) }}" class="contents" data-no-ajax onsubmit="return confirm('{{ __('Delete this backup file?') }}')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20">

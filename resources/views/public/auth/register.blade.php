@@ -87,6 +87,10 @@
                     <input type="password" name="password_confirmation" required autocomplete="new-password" class="app-input transition-all duration-300 focus:scale-[1.01]" placeholder="••••••••">
                 </label>
 
+                <div class="stagger-item" style="animation-delay:630ms">
+                    @include('partials.turnstile')
+                </div>
+
                 <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:660ms">{{ __('Create account') }}</button>
             </form>
 

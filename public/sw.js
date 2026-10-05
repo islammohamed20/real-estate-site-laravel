@@ -1,6 +1,5 @@
-const CACHE_NAME = 'real-estate-pwa-v7';
+const CACHE_NAME = 'real-estate-pwa-v8';
 const STATIC_ASSETS = [
-  '/',
   '/offline.html',
   '/manifest.webmanifest',
   '/icons/icon.svg',
@@ -32,11 +31,32 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-/* ── Fetch: network-first with cache fallback ── */
+/* ── Fetch: cache static assets only, never HTML pages ── */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || !['http:', 'https:'].includes(url.protocol)) return;
+
+  // HTML documents (navigations) must always come from the network: they carry
+  // CSRF tokens and user-specific data, and stale HTML breaks form actions.
+  const isNavigation = request.mode === 'navigate'
+    || (request.headers.get('accept') || '').includes('text/html');
+  const isStaticAsset = /\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|map)$/i.test(url.pathname)
+    || url.pathname.startsWith('/build/')
+    || url.pathname.startsWith('/icons/');
+
+  if (isNavigation || !isStaticAsset) {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        if (isNavigation) {
+          const offline = await caches.match('/offline.html');
+          if (offline) return offline;
+        }
+        return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+      })
+    );
+    return;
+  }
 
   event.respondWith(
     fetch(request)
@@ -50,8 +70,7 @@ self.addEventListener('fetch', (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        const offline = await caches.match('/offline.html');
-        return offline || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+        return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
       })
   );
 });

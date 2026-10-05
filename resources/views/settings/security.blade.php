@@ -88,6 +88,69 @@
             @endif
         </section>
 
+        {{-- Passkeys management --}}
+        <section class="app-card app-card--gradient space-y-5">
+            <div>
+                <h2 class="text-lg font-semibold text-white">{{ __('Passkeys') }}</h2>
+                <p class="text-sm text-slate-400">{{ __('Add a fingerprint or device passkey to sign in without a password and confirm sensitive actions.') }}</p>
+            </div>
+
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-start gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+                        <div>
+                            <p class="text-sm font-semibold text-white">{{ $user?->passkeys()->exists() ? __('Passkey is active') : __('No passkey registered') }}</p>
+                            <p class="mt-1 text-xs text-slate-400">
+                                @if ($user?->passkeys()->exists())
+                                    {{ __('You can sign in and confirm sensitive actions with your registered passkey.') }}
+                                @else
+                                    {{ __('Register a passkey to sign in without a password and confirm sensitive actions.') }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="register-passkey" class="app-button">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                            {{ __('Register a new passkey') }}
+                        </button>
+                    </div>
+                </div>
+
+                @if ($user?->passkeys()->exists())
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-300">
+                            <thead class="border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th class="pb-3 pr-4">{{ __('Name') }}</th>
+                                    <th class="pb-3 pr-4">{{ __('Added') }}</th>
+                                    <th class="pb-3 pr-4">{{ __('Last used') }}</th>
+                                    <th class="pb-3 pr-4"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach ($user->passkeys as $passkey)
+                                    <tr>
+                                        <td class="py-3 pr-4">{{ $passkey->name }}</td>
+                                        <td class="py-3 pr-4">{{ $passkey->created_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                                        <td class="py-3 pr-4">{{ $passkey->last_used_at?->format('Y-m-d H:i') ?? '-' }}</td>
+                                        <td class="py-3 pr-4 text-right">
+                                            <form method="POST" action="/user/passkeys/{{ $passkey->id }}" data-passkey-confirm>
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-rose-400 hover:text-rose-300" onclick="return confirm('{{ __('Remove this passkey?') }}')">{{ __('Remove') }}</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </section>
+
         {{-- Two-Factor Authentication management --}}
         <section class="app-card app-card--gradient space-y-5">
             <div>
@@ -172,3 +235,31 @@
         </section>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const button = document.getElementById('register-passkey');
+        if (!button) return;
+
+        button.addEventListener('click', () => {
+            if (!window.Passkeys || !window.Passkeys.isSupported()) {
+                alert('{{ __('Passkeys are not supported on this device.') }}');
+                return;
+            }
+
+            const name = prompt('{{ __('Device name (e.g. iPhone, Android, MacBook)') }}', '');
+            if (!name) return;
+
+            window.Passkeys.register({ name })
+                .then(() => {
+                    window.location.reload();
+                })
+                .catch((error) => {
+                    console.error('Passkey registration failed:', error);
+                    alert(error?.message || '{{ __('Passkey registration failed.') }}');
+                });
+        });
+    })();
+</script>
+@endpush

@@ -45,8 +45,8 @@ class DashboardStatisticsService
         $totalOffers = Offer::query()->count();
         $totalOffersValue = (float) Offer::query()->sum('total_amount');
 
-        $activeReservations = Reservation::query()->where('status', 'active')->count();
-        $totalDeposits = (float) Reservation::query()->where('status', 'active')->sum('deposit_amount');
+        $activeReservations = Reservation::query()->whereIn('status', ['pending', 'paid'])->count();
+        $totalDeposits = (float) Reservation::query()->whereIn('status', ['pending', 'paid'])->sum('deposit_amount');
 
         $whatsappConversations = WhatsAppConversation::query()->count();
         $whatsappUnread = (int) WhatsAppConversation::query()->sum('unread_count');

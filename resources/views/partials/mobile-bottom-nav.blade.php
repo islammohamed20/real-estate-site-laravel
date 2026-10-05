@@ -1,16 +1,17 @@
 @php
+    $user = auth()->user();
     $items = [
-        ['label' => __('Dashboard'), 'route' => 'dashboard.home', 'icon' => 'home'],
-        ['label' => __('CRM'), 'route' => 'dashboard.crm.index', 'icon' => 'users'],
-        ['label' => __('WhatsApp'), 'route' => 'dashboard.whatsapp.index', 'icon' => 'whatsapp'],
-        ['label' => __('Calculator'), 'route' => 'dashboard.installments.index', 'icon' => 'calculator'],
+        ['label' => __('Dashboard'), 'route' => 'dashboard.home', 'icon' => 'home', 'section' => 'dashboard'],
+        ['label' => __('CRM'), 'route' => 'dashboard.crm.index', 'icon' => 'users', 'section' => 'crm'],
+        ['label' => __('WhatsApp'), 'route' => 'dashboard.whatsapp.index', 'icon' => 'whatsapp', 'section' => 'crm'],
+        ['label' => __('Calculator'), 'route' => 'dashboard.installments.index', 'icon' => 'calculator', 'section' => 'tools'],
     ];
 
-    if (auth()->user()?->can('manage settings')) {
-        $items[] = ['label' => __('Settings'), 'route' => 'dashboard.settings.index', 'icon' => 'settings'];
+    if ($user !== null && $user->can('manage settings')) {
+        $items[] = ['label' => __('Settings'), 'route' => 'dashboard.settings.index', 'icon' => 'settings', 'section' => 'settings'];
     }
 
-    $user = auth()->user();
+    $items = array_values(array_filter($items, fn ($item) => $user === null || $user->hasDashboardSection($item['section'])));
     if ($user === null || (! $user->can('view whatsapp') && ! $user->can('view all whatsapp conversations') && ! $user->can('manage crm'))) {
         $items = array_values(array_filter($items, fn ($item) => ($item['route'] ?? '') !== 'dashboard.whatsapp.index'));
     }

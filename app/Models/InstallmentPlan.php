@@ -29,7 +29,11 @@ class InstallmentPlan extends Model
         'status',
         'currency_code',
         'base_price',
+        'excellence_percent',
+        'excellence_amount',
+        'base_price_with_excellence',
         'discount_amount',
+        'discount_percent',
         'final_price',
         'maintenance_deposit',
         'down_payment',
@@ -47,7 +51,11 @@ class InstallmentPlan extends Model
     {
         return [
             'base_price' => 'decimal:2',
+            'excellence_percent' => 'decimal:2',
+            'excellence_amount' => 'decimal:2',
+            'base_price_with_excellence' => 'decimal:2',
             'discount_amount' => 'decimal:2',
+            'discount_percent' => 'decimal:2',
             'final_price' => 'decimal:2',
             'maintenance_deposit' => 'decimal:2',
             'down_payment' => 'decimal:2',

@@ -78,12 +78,35 @@ class CustomerTest extends TestCase
                 'name' => 'Updated Customer',
                 'phone' => $customer->phone,
                 'email' => $customer->email,
+                'source' => $customer->source ?? 'Website',
             ])
             ->assertRedirect();
 
         $this->assertDatabaseHas('customers', [
             'id' => $customer->id,
             'name' => 'Updated Customer',
+        ]);
+    }
+
+    public function test_customer_can_be_assigned_to_multiple_sales_users(): void
+    {
+        $customer = Customer::factory()->create();
+        $salesOne = User::factory()->create(['is_active' => true]);
+        $salesTwo = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($this->user)
+            ->post(route('dashboard.crm.customers.assign', $customer), [
+                'assigned_sales_ids' => [$salesOne->id, $salesTwo->id],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('customer_sales_user', [
+            'customer_id' => $customer->id,
+            'user_id' => $salesOne->id,
+        ]);
+        $this->assertDatabaseHas('customer_sales_user', [
+            'customer_id' => $customer->id,
+            'user_id' => $salesTwo->id,
         ]);
     }
 
@@ -96,6 +119,7 @@ class CustomerTest extends TestCase
             ->put(route('dashboard.crm.customers.update', $customer), [
                 'name' => $customer->name,
                 'phone' => $customer->phone,
+                'source' => $customer->source ?? 'Website',
                 'tags' => [(string) $tag->id],
             ])
             ->assertRedirect();

@@ -24,4 +24,16 @@ return [
         'instance_name' => env('EVOLUTION_INSTANCE_NAME'),
         'sales_manager_whatsapp' => env('SALES_MANAGER_WHATSAPP'),
     ],
+
+    'turnstile' => [
+        'enabled' => env('TURNSTILE_ENABLED', true),
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'webhook_token' => env('GEMINI_WEBHOOK_TOKEN'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+    ],
 ];

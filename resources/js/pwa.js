@@ -7,7 +7,8 @@ export function registerPwa() {
 
     window.addEventListener('load', async () => {
         try {
-            await navigator.serviceWorker.register('/sw.js');
+            // Version query busts any CDN-cached copy of the old service worker.
+            await navigator.serviceWorker.register('/sw.js?v=8');
         } catch (error) {
             console.error('Service worker registration failed', error);
         }

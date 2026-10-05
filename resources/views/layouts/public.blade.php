@@ -1,6 +1,11 @@
 <!doctype html>
 @php
     $companyProfile = \App\Models\CompanyProfile::first();
+    $defaultDownPaymentPercent = (float) (\App\Models\InstallmentTemplate::query()
+        ->where('is_active', true)
+        ->orderByDesc('is_default')
+        ->orderBy('name')
+        ->value('down_payment_percent') ?? 25);
     $isCustomerAuth = auth('customer')->check();
     $isAdminAuth = auth()->check();
 @endphp
@@ -15,7 +20,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="icon" type="image/svg+xml" href="{{ $companyProfile?->favicon_path ?? '/icons/icon-maskable.svg' }}">
+    <link rel="icon" href="{{ $companyProfile?->favicon_path ?? '/icons/icon-maskable.svg' }}">
     <link rel="apple-touch-icon" href="{{ $companyProfile?->favicon_path ?? '/icons/icon-maskable.svg' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,6 +50,37 @@
     @if ($seoImage)
         <meta name="twitter:image" content="{{ $seoImage }}">
     @endif
+    @php
+        $siteName = $company->name ?: config('app.name');
+        $siteUrl = rtrim((string) config('app.url'), '/').'/';
+        $logoUrl = $company->logo_light_path ?: $company->favicon_path;
+        $organizationSchema = [
+            '@type' => 'Organization',
+            '@id' => $siteUrl.'#organization',
+            'url' => $siteUrl,
+            'name' => $siteName,
+            'alternateName' => 'فينيسيا للتطوير العقاري',
+        ];
+        if ($logoUrl) {
+            $organizationSchema['logo'] = ['@type' => 'ImageObject', 'url' => $logoUrl];
+        }
+        $structuredData = [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                [
+                    '@type' => 'WebSite',
+                    '@id' => $siteUrl.'#website',
+                    'url' => $siteUrl,
+                    'name' => $siteName,
+                    'alternateName' => 'فينيسيا للتطوير العقاري',
+                    'inLanguage' => ['ar', 'en'],
+                    'publisher' => ['@id' => $siteUrl.'#organization'],
+                ],
+                $organizationSchema,
+            ],
+        ];
+    @endphp
+    <script type="application/ld+json">{!! json_encode($structuredData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}</script>
     <script>
         (function () {
             try {
@@ -55,6 +91,10 @@
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    @if (config('services.turnstile.enabled') && config('services.turnstile.site_key'))
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    @endif
 </head>
 <body class="flex min-h-screen flex-col bg-slate-950 text-slate-100" x-data="{ menuOpen: false }">
     @php($currentRoute = request()->route()?->getName())
@@ -149,6 +189,7 @@
             <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
                 <a href="{{ route('home') }}" class="nav-link {{ $currentRoute === 'home' ? 'is-active' : '' }}">{{ __('Home') }}</a>
                 <a href="{{ route('public.projects.index') }}" class="nav-link {{ $currentRoute === 'public.projects.index' || str_starts_with((string) $currentRoute, 'public.projects') || $currentRoute === 'public.units.show' ? 'is-active' : '' }}">{{ __('Projects') }}</a>
+                <a href="{{ route('public.portfolio') }}" class="nav-link {{ $currentRoute === 'public.portfolio' ? 'is-active' : '' }}">{{ __('Track Record') }}</a>
                 <a href="{{ route('installments.index') }}" class="nav-link {{ $currentRoute === 'installments.index' || $currentRoute === 'installments.calculate' ? 'is-active' : '' }}">{{ __('Calculator') }}</a>
                 <a href="{{ route('public.about') }}" class="nav-link {{ $currentRoute === 'public.about' ? 'is-active' : '' }}">{{ __('About') }}</a>
                 <a href="{{ route('public.contact') }}" class="nav-link {{ $currentRoute === 'public.contact' ? 'is-active' : '' }}">{{ __('Contact Us') }}</a>
@@ -211,6 +252,7 @@
         <div class="mt-4 space-y-2">
             <a class="mobile-drawer__link {{ $currentRoute === 'home' ? 'is-active' : '' }}" href="{{ route('home') }}">{{ __('Home') }} <span>→</span></a>
             <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'public.projects') ? 'is-active' : '' }}" href="{{ route('public.projects.index') }}">{{ __('Projects') }} <span>→</span></a>
+            <a class="mobile-drawer__link {{ $currentRoute === 'public.portfolio' ? 'is-active' : '' }}" href="{{ route('public.portfolio') }}">{{ __('Track Record') }} <span>→</span></a>
             <a class="mobile-drawer__link {{ str_starts_with((string) $currentRoute, 'installments') ? 'is-active' : '' }}" href="{{ route('installments.index') }}">{{ __('Calculator') }} <span>→</span></a>
             <a class="mobile-drawer__link {{ $currentRoute === 'public.about' ? 'is-active' : '' }}" href="{{ route('public.about') }}">{{ __('About') }} <span>→</span></a>
             <a class="mobile-drawer__link {{ $currentRoute === 'public.contact' ? 'is-active' : '' }}" href="{{ route('public.contact') }}">{{ __('Contact Us') }} <span>→</span></a>

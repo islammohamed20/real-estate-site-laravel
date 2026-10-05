@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\FollowUp;
+use App\Models\SalesTeam;
 use App\Models\User;
+use App\Notifications\CrmActivityNotification;
 use App\Services\PushNotificationService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -42,23 +44,47 @@ class NotifyUpcomingFollowUps extends Command
 
             $clientName = $fu->customer?->name ?? $fu->lead?->name ?? __("Unknown");
             $type = $fu->type ?? __("Follow-up");
-            $channel = $fu->channel ? " via " . $fu->channel : "";
             $time = $fu->follow_up_at->format("H:i");
 
             $title = "⏰ Follow-up in " . $minutes . " min";
             $body = sprintf(
-                "%s %s - %s%s at %s",
+                "%s %s - %s at %s",
                 $type,
                 __("with"),
                 $clientName,
-                $channel,
                 $time
             );
 
             $url = "/real-statement-control/crm/follow-ups";
+            $notification = new CrmActivityNotification('followup_reminder', [
+                'follow_up_id' => $fu->id,
+                'name' => $clientName,
+                'type' => $type,
+                'minutes' => $minutes,
+                'action_url' => $url,
+            ]);
+
+            if (! $assignee->hasAnyRole(['Administrator', 'Owner'])
+                && $assignee->acceptsNotification('followup_reminder')) {
+                \Illuminate\Support\Facades\Notification::send($assignee, $notification);
+            }
+            CrmActivityNotification::notifyRelevant($notification, $assignee, includeOwner: false);
+
+            $managerIds = SalesTeam::query()
+                ->whereHas('members', fn ($query) => $query->whereKey($assignee->id))
+                ->pluck('manager_id')
+                ->filter();
+            $recipientIds = $managerIds->push($assignee->id)->unique()->values();
+            $recipients = User::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($recipientIds): void {
+                    $query->whereIn('id', $recipientIds)
+                        ->orWhereHas('roles', fn ($role) => $role->whereIn('name', ['Administrator', 'Owner']));
+                })
+                ->get();
 
             $push->sendToUsers(
-                collect([$assignee]),
+                $recipients,
                 $title,
                 $body,
                 $url,

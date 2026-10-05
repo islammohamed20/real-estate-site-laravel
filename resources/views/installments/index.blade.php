@@ -1,37 +1,6 @@
 @extends($layout ?? 'layouts.public')
 
 @section('content')
-    @php
-        $template = $templates->first();
-        $preselectedUnit = $units->firstWhere('id', request('unit_id'));
-        $preselectedProjectId = request('project_id', $preselectedUnit?->project_id);
-        $preselectedBuildingId = request('building_id', $preselectedUnit?->building_id);
-        $defaultInstallmentYears = $template
-            ? $template->installment_count * $template->installment_frequency->monthsPerInstallment() / 12
-            : 4;
-
-        // Always produce a valid number for the Alpine x-data initializers. A failed
-        // validation redirect (withInput) can otherwise render "area: " and break the
-        // whole Alpine component, leaving every field empty.
-        $calcNum = fn (string $field, mixed $default): float => is_numeric(old($field)) ? (float) old($field) : (float) ($default ?? 0);
-        $calcDefaults = [
-            'area' => $calcNum('area', $preselectedUnit?->area ?? 0),
-            'price_per_meter' => $calcNum('price_per_meter', $preselectedUnit?->price_per_meter ?? 0),
-            'garden_price' => $calcNum('garden_price', $preselectedUnit?->garden_price ?? 0),
-            'roof_price' => $calcNum('roof_price', $preselectedUnit?->roof_price ?? 0),
-            'roof_area' => $calcNum('roof_area', $preselectedUnit?->roof_area ?? 0),
-            'excellence_percent' => $calcNum('excellence_percent', $preselectedUnit?->excellence_percent ?? $template?->defaults()['excellence_percent'] ?? 0),
-            'down_payment_percent' => $calcNum('down_payment_percent', $template?->down_payment_percent ?? 10),
-            'down_payment' => $calcNum('down_payment', 0),
-            'maintenance_percent' => $calcNum('maintenance_percent', $template?->maintenance_percent ?? $companyProfile?->maintenance_percent ?? 7),
-            'installment_years' => $calcNum('installment_years', $defaultInstallmentYears),
-            // Only monthly/quarterly are offered; normalize anything else (e.g. a
-            // semi-annual template default) to quarterly so the dropdown stays valid.
-            'installment_type' => (fn (): string => in_array(old('installment_type', $template?->installment_frequency?->value ?? 'quarterly'), ['monthly', 'quarterly'], true)
-                ? (string) old('installment_type', $template?->installment_frequency?->value ?? 'quarterly')
-                : 'quarterly')(),
-        ];
-    @endphp
     <div
         class="space-y-6 pt-4"
         x-data="{
@@ -49,11 +18,13 @@
             installmentType: '{{ $calcDefaults['installment_type'] }}',
             paymentMethod: '{{ old('payment_method', 'installments') }}',
             firstInstallmentDate: '{{ old('first_installment_date', now()->toDateString()) }}',
-            unitId: '{{ old('unit_id', request('unit_id')) }}',
+            unitId: '{{ $selectedUnitId }}',
             projectId: '{{ old('project_id', $preselectedProjectId) }}',
             buildingId: '{{ old('building_id', $preselectedBuildingId) }}',
             floorId: '{{ old('floor_id') }}',
-            templateId: '{{ old('installment_template_id', $template?->id) }}',
+            templateId: '{{ $templateId }}',
+            defaultInstallmentYears: {{ $defaultInstallmentYears }},
+            projectLimits: {{ Js::from($projects->mapWithKeys(fn ($project) => [(string) $project->id => (int) ($project->max_installment_years ?? 0)])->all()) }},
             installmentLabel: @js(__('Installment')),
             buildings: {{ Js::from($buildings->map(fn ($b) => [
                 'id' => (int) $b->id,
@@ -94,6 +65,10 @@
             },
             get selectedBuilding() {
                 return this.buildings.find(x => Number(x.id) === Number(this.buildingId)) || null;
+            },
+            get projectMaxYears() {
+                const maxYears = this.projectLimits[String(this.projectId)] || 0;
+                return maxYears > 0 ? Number(maxYears) : null;
             },
             get unitAvailable() {
                 return ! this.selectedUnit || this.selectedUnit.status === 'available';
@@ -153,7 +128,11 @@
                     this.roofPrice = u.roof_price;
                     this.roofArea = u.roof_area;
                     this.excellencePercent = u.excellence_percent;
+                    this.installmentYears = this.projectLimits[String(this.projectId)] || this.defaultInstallmentYears;
                 }
+            },
+            applyProjectInstallmentLimit() {
+                this.installmentYears = this.projectMaxYears || this.defaultInstallmentYears;
             },
             init() {
                 // The unit/building options are rendered by x-for AFTER the x-model
@@ -176,6 +155,8 @@
                 });
             },
             onProjectChange() {
+                this.applyProjectInstallmentLimit();
+
                 const u = this.units.find(x => Number(x.id) === Number(this.unitId));
                 const b = this.buildings.find(x => Number(x.id) === Number(this.buildingId));
 
@@ -261,6 +242,12 @@
                 </div>
             </div>
 
+            @if ($requestedUnitUnavailable)
+                <div role="status" class="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    {{ __('The selected unit is no longer available. Please choose an available unit.') }}
+                </div>
+            @endif
+
             @if ($preselectedUnit)
                 <div class="mt-6 flex items-center gap-3 rounded-2xl border border-brand-500/20 bg-brand-500/10 px-4 py-3 text-sm text-brand-200">
                     <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" stroke-width="1.8"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -272,6 +259,7 @@
         <div class="grid gap-6 lg:grid-cols-3">
             {{-- Form Column --}}
             <form method="POST" action="{{ route($calculatorRoutes['calculate']) }}" class="lg:col-span-2 space-y-6"
+                  data-no-ajax
                   @submit="if (selectedUnit && ! unitAvailable) { $event.preventDefault(); alert('{{ __('This unit is not available for sale.') }}'); }">
                 @csrf
 
@@ -413,8 +401,11 @@
                             <input class="app-input" type="number" step="0.1" min="0" max="100" x-model="maintenancePercent" name="maintenance_percent">
                         </label>
                         <label class="space-y-2" x-show="!isCash">
-                            <span class="text-sm font-medium text-slate-300">{{ __('Installment years') }}</span>
-                            <input class="app-input" type="number" step="0.5" min="1" x-model="installmentYears" name="installment_years">
+                            <span class="text-sm font-medium text-slate-300">
+                                {{ __('Installment years') }}
+                                <span x-show="projectMaxYears" x-text="'(max ' + projectMaxYears + ' years)'" class="text-xs text-brand-300"></span>
+                            </span>
+                            <input class="app-input" type="number" step="0.5" min="1" :max="projectMaxYears || 50" x-model="installmentYears" name="installment_years" @input="if (projectMaxYears && Number(installmentYears) > projectMaxYears) installmentYears = projectMaxYears">
                             <input type="hidden" name="installment_count" :value="installmentCount">
                             <p class="text-xs text-slate-400">
                                 {{ __('Number of Installments') }}: <span x-text="installmentCount"></span>

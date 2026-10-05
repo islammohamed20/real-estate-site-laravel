@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Block authenticated users who have 2FA enabled until they pass the
- * one-time challenge for the current session.
+ * Block authenticated users who have a configured second factor (Google
+ * Authenticator or Passkey) until they pass the one-time challenge.
  */
 class RequireTwoFactor
 {
@@ -18,7 +18,7 @@ class RequireTwoFactor
     {
         $user = $request->user();
 
-        if ($user?->two_factor_enabled && ! $request->session()->get('2fa:verified')) {
+        if ($user?->needsSecondFactor() && ! $request->session()->get('2fa:verified')) {
             $request->session()->put('2fa:user:id', $user->id);
 
             return redirect()->route('2fa.verify');

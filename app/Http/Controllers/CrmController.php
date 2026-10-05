@@ -30,10 +30,41 @@ class CrmController extends Controller
 {
     public function index(): View
     {
-        $tasks = Task::query()->with(['assignee', 'creator', 'taskable'])->latest()->take(50)->get();
-        $notes = Note::query()->with(['user', 'noteable'])->latest()->take(50)->get();
+        $user = auth()->user();
+        $canViewAllLeads = $user->hasAnyPermission(['view all leads', 'manage crm']);
+        $canViewAllCustomers = $user->hasAnyPermission(['view all customers', 'manage crm']);
+        $canViewAllDeals = $user->hasAnyPermission(['view all deals', 'manage crm']);
+        $canViewAllTasks = $user->hasAnyPermission(['view all tasks', 'manage crm']);
+        $canViewAllNotes = $user->hasAnyPermission([
+            'view all leads', 'view all customers', 'view all deals', 'view reports', 'manage crm',
+        ]);
 
-        $histories = Lead::query()->with(['customer', 'stageHistory.user', 'stageHistory.lead.customer'])->latest()->take(25)->get()->pluck('stageHistory')->flatten()->sortByDesc('changed_at')->take(25)->values();
+        $tasks = Task::query()
+            ->when(! $canViewAllTasks, fn ($q) => $q->where(fn ($scope) => $scope
+                ->where('assigned_to', $user->id)
+                ->orWhere('created_by', $user->id)))
+            ->with(['assignee', 'creator', 'taskable'])
+            ->latest()
+            ->take(50)
+            ->get();
+        $notes = Note::query()
+            ->when(! $canViewAllNotes, fn ($q) => $q->where('user_id', $user->id))
+            ->with(['user', 'noteable'])
+            ->latest()
+            ->take(50)
+            ->get();
+
+        $histories = Lead::query()
+            ->when(! $canViewAllLeads, fn ($q) => $q->where('assigned_sales_id', $user->id))
+            ->with(['customer', 'stageHistory.user', 'stageHistory.lead.customer'])
+            ->latest()
+            ->take(25)
+            ->get()
+            ->pluck('stageHistory')
+            ->flatten()
+            ->sortByDesc('changed_at')
+            ->take(25)
+            ->values();
 
         $timeline = new Collection;
 
@@ -70,23 +101,37 @@ class CrmController extends Controller
             ]);
         }
 
+        $leadsQuery = Lead::query()
+            ->when(! $canViewAllLeads, fn ($q) => $q->where('assigned_sales_id', $user->id));
+        $customersQuery = Customer::query()
+            ->when(! $canViewAllCustomers, fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', $user->id)));
+        $dealsQuery = CrmDeal::query()
+            ->when(! $canViewAllDeals, fn ($q) => $q->where(fn ($scope) => $scope
+                ->where('assigned_to', $user->id)
+                ->orWhere('created_by', $user->id)));
+
         return view('crm.index', [
-            'leads' => Lead::query()->with(['customer', 'assignedSales', 'interestedProjects'])->latest()->paginate(8),
-            'customers' => Customer::query()->withCount('leads')->latest()->paginate(8),
+            'leads' => (clone $leadsQuery)->with(['customer', 'assignedSales', 'interestedProjects'])->latest()->paginate(8),
+            'customers' => (clone $customersQuery)->withCount('leads')->latest()->paginate(8),
             'stats' => [
-                'leads' => Lead::query()->count(),
-                'customers' => Customer::query()->count(),
-                'follow_ups_today' => Lead::query()->whereDate('follow_up_at', today())->count(),
-                'open_tasks' => Task::query()->whereNotIn('status', ['completed', 'cancelled'])->count(),
-                'open_deals' => CrmDeal::query()->where('status', 'open')->count(),
+                'leads' => (clone $leadsQuery)->count(),
+                'customers' => (clone $customersQuery)->count(),
+                'follow_ups_today' => (clone $leadsQuery)->whereDate('follow_up_at', today())->count(),
+                'open_tasks' => Task::query()
+                    ->when(! $canViewAllTasks, fn ($q) => $q->where(fn ($scope) => $scope
+                        ->where('assigned_to', $user->id)
+                        ->orWhere('created_by', $user->id)))
+                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->count(),
+                'open_deals' => (clone $dealsQuery)->where('status', 'open')->count(),
             ],
             'tasks' => $tasks,
             'notes' => $notes,
             'timeline' => $timeline->sortByDesc('at')->values(),
             'users' => User::query()->active()->pluck('name', 'id'),
-            'leadOptions' => Lead::query()->orderBy('name')->pluck('name', 'id'),
-            'customerOptions' => Customer::query()->orderBy('name')->pluck('name', 'id'),
-            'dealOptions' => CrmDeal::query()->orderBy('title')->pluck('title', 'id'),
+            'leadOptions' => (clone $leadsQuery)->orderBy('name')->pluck('name', 'id'),
+            'customerOptions' => (clone $customersQuery)->orderBy('name')->pluck('name', 'id'),
+            'dealOptions' => (clone $dealsQuery)->orderBy('title')->pluck('title', 'id'),
             'organizationOptions' => CrmOrganization::query()->orderBy('name')->pluck('name', 'id'),
             'contactOptions' => CrmContact::query()->orderBy('first_name')->get()->mapWithKeys(fn ($c) => [$c->id => $c->full_name]),
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
@@ -120,6 +165,8 @@ class CrmController extends Controller
 
     public function storeTask(Request $request): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -139,6 +186,8 @@ class CrmController extends Controller
             return back()->with('error', __('Related record not found.'));
         }
 
+        $this->authorize('view', $taskable);
+
         $taskable->tasks()->create([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -154,6 +203,9 @@ class CrmController extends Controller
 
     public function updateTask(Request $request, Task $task): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+        $this->authorizeLegacyTask($task);
+
         $validated = $request->validate([
             'status' => ['required', 'in:open,in_progress,completed,cancelled'],
         ]);
@@ -168,6 +220,9 @@ class CrmController extends Controller
 
     public function destroyTask(Task $task): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+        $this->authorizeLegacyTask($task);
+
         $task->delete();
 
         return back()->with('status', __('Task deleted successfully.'));
@@ -175,6 +230,8 @@ class CrmController extends Controller
 
     public function storeNote(Request $request): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $validated = $request->validate([
             'body' => ['required', 'string'],
             'type' => ['required', 'in:call,meeting,note'],
@@ -195,6 +252,10 @@ class CrmController extends Controller
             return back()->with('error', __('Related record not found.'));
         }
 
+        if ($noteable instanceof Lead || $noteable instanceof Customer || $noteable instanceof CrmDeal) {
+            $this->authorize('view', $noteable);
+        }
+
         $noteable->recordedNotes()->create([
             'user_id' => auth()->id(),
             'body' => $validated['body'],
@@ -207,6 +268,10 @@ class CrmController extends Controller
 
     public function destroyNote(Note $note): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+        $note->loadMissing('noteable');
+        $this->authorizeLegacyNote($note);
+
         $note->delete();
 
         return back()->with('status', __('Note deleted successfully.'));
@@ -214,6 +279,8 @@ class CrmController extends Controller
 
     public function indexOrganizations(): View
     {
+        $this->authorizeLegacyCrm();
+
         $organizations = CrmOrganization::query()
             ->withCount('contacts')
             ->latest()
@@ -224,6 +291,8 @@ class CrmController extends Controller
 
     public function showOrganization(CrmOrganization $organization): View
     {
+        $this->authorizeLegacyCrm();
+
         $organization->load(['contacts', 'deals']);
 
         return view('crm.organizations.show', [
@@ -234,11 +303,15 @@ class CrmController extends Controller
 
     public function editOrganization(CrmOrganization $organization): View
     {
+        $this->authorizeLegacyCrm();
+
         return view('crm.organizations.edit', ['organization' => $organization]);
     }
 
     public function updateOrganization(OrganizationRequest $request, CrmOrganization $organization): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $organization->update($request->validated());
 
         return redirect()->route('dashboard.crm.organizations.show', $organization)
@@ -247,6 +320,8 @@ class CrmController extends Controller
 
     public function destroyOrganization(CrmOrganization $organization): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $organization->delete();
 
         return redirect()->route('dashboard.crm.organizations.index')
@@ -255,6 +330,8 @@ class CrmController extends Controller
 
     public function editContact(CrmContact $contact): View
     {
+        $this->authorizeLegacyCrm();
+
         return view('crm.contacts.edit', [
             'contact' => $contact,
             'organizations' => CrmOrganization::query()->orderBy('name')->pluck('name', 'id'),
@@ -263,6 +340,8 @@ class CrmController extends Controller
 
     public function updateContact(ContactRequest $request, CrmContact $contact): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $validated = $request->validated();
         $validated['is_primary'] = (bool) ($validated['is_primary'] ?? false);
 
@@ -281,6 +360,8 @@ class CrmController extends Controller
 
     public function destroyContact(CrmContact $contact): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $organizationId = $contact->organization_id;
         $contact->delete();
 
@@ -290,6 +371,8 @@ class CrmController extends Controller
 
     public function storeOrganization(Request $request): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'industry' => ['nullable', 'string', 'max:100'],
@@ -310,6 +393,8 @@ class CrmController extends Controller
 
     public function storeContact(Request $request): RedirectResponse
     {
+        $this->authorizeLegacyCrm();
+
         $validated = $request->validate([
             'organization_id' => ['required', 'exists:crm_organizations,id'],
             'first_name' => ['required', 'string', 'max:255'],
@@ -332,5 +417,28 @@ class CrmController extends Controller
         CrmContact::query()->create($validated);
 
         return back()->with('status', __('Contact created successfully.'));
+    }
+
+    private function authorizeLegacyCrm(): void
+    {
+        abort_unless(auth()->user()?->hasPermissionTo('manage crm'), 403);
+    }
+
+    private function authorizeLegacyTask(Task $task): void
+    {
+        abort_unless(
+            auth()->user()?->hasAnyPermission(['manage crm', 'edit all tasks', 'delete tasks'])
+                || $task->assigned_to === auth()->id()
+                || $task->created_by === auth()->id(),
+            403,
+        );
+    }
+
+    private function authorizeLegacyNote(Note $note): void
+    {
+        abort_unless(
+            auth()->user()?->hasPermissionTo('manage crm') || $note->user_id === auth()->id(),
+            403,
+        );
     }
 }

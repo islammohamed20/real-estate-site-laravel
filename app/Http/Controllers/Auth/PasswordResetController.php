@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Rules\Turnstile;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordResetController extends Controller
 {
@@ -26,9 +30,26 @@ class PasswordResetController extends Controller
      */
     public function sendResetLink(Request $request): RedirectResponse
     {
-        $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'turnstile' => Rule::when(
+                config('services.turnstile.enabled') && config('services.turnstile.secret_key'),
+                ['required', 'string', new Turnstile],
+                []
+            ),
+        ]);
 
-        $status = Password::broker('users')->sendResetLink($request->only('email'));
+        try {
+            $status = Password::broker('users')->sendResetLink($request->only('email'));
+        } catch (TransportExceptionInterface $exception) {
+            Log::error('Password reset email delivery failed.', [
+                'exception' => $exception::class,
+            ]);
+
+            return back()->withErrors([
+                'email' => __('Password reset email service is currently unavailable. Please contact an administrator.'),
+            ])->withInput($request->only('email'));
+        }
 
         // Always show the same friendly message so an attacker cannot tell
         // whether an account exists for that email.
@@ -54,6 +75,11 @@ class PasswordResetController extends Controller
             'token' => ['required'],
             'email' => ['required', 'email', 'max:255'],
             'password' => ['required', 'confirmed', 'min:8'],
+            'turnstile' => Rule::when(
+                config('services.turnstile.enabled') && config('services.turnstile.secret_key'),
+                ['required', 'string', new Turnstile],
+                []
+            ),
         ]);
 
         $status = Password::broker('users')->reset(

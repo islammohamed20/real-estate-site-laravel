@@ -15,9 +15,9 @@ class InstallmentTemplateSeeder extends Seeder
         InstallmentTemplate::query()->updateOrCreate(
             ['code' => 'standard-10-down-16-q'],
             [
-                'name' => '10% Down Payment / 16 Quarterly Installments',
-                'description' => 'Standard payment plan with 10% down payment and 16 quarterly installments.',
-                'down_payment_percent' => 10,
+                'name' => '25% Down Payment / 16 Quarterly Installments',
+                'description' => 'Standard payment plan with 25% down payment and 16 quarterly installments.',
+                'down_payment_percent' => 25,
                 'installment_count' => 16,
                 'installment_frequency' => InstallmentFrequency::Quarterly,
                 'maintenance_percent' => 7,

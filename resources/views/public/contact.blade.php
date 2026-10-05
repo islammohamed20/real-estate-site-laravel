@@ -62,6 +62,8 @@
                         @error('message')<p class="text-xs text-rose-400">{{ $message }}</p>@enderror
                     </div>
 
+                    @include('partials.turnstile')
+
                     <button type="submit" class="app-button w-full">
                         {{ __('Send Inquiry') }}
                     </button>

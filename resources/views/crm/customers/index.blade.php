@@ -34,25 +34,41 @@
         <div class="border-t border-white/10 p-4">
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 @forelse ($customers as $customer)
-                    <a href="{{ route('dashboard.crm.customers.show', $customer) }}" class="app-card app-card--gradient p-4 block transition hover:border-brand-500/30">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="truncate text-lg font-semibold text-white">{{ $customer->name }}</h3>
-                                <p class="text-sm text-slate-400">{{ $customer->phone }}</p>
+                    <div class="app-card app-card--gradient p-4 block transition hover:border-brand-500/30">
+                        <a href="{{ route('dashboard.crm.customers.show', $customer) }}" class="block">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <h3 class="truncate text-lg font-semibold text-white">{{ $customer->name }}</h3>
+                                    <p class="text-sm text-slate-400">{{ $customer->phone }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-brand-500/20 px-3 py-1 text-xs font-semibold text-brand-300">{{ $customer->leads_count }} {{ __('leads') }}</span>
                             </div>
-                            <span class="shrink-0 rounded-full bg-brand-500/20 px-3 py-1 text-xs font-semibold text-brand-300">{{ $customer->leads_count }} {{ __('leads') }}</span>
-                        </div>
-                        <div class="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-300">
-                            <div>
-                                <span class="block text-xs text-slate-500">{{ __('Budget') }}</span>
-                                <span class="font-semibold text-white">{{ $customer->budget ? 'EGP ' . number_format((float) $customer->budget) : '—' }}</span>
+                            <div class="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-300">
+                                <div>
+                                    <span class="block text-xs text-slate-500">{{ __('Budget') }}</span>
+                                    <span class="font-semibold text-white">{{ $customer->budget ? 'EGP ' . number_format((float) $customer->budget) : '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="block text-xs text-slate-500">{{ __('Source') }}</span>
+                                    <span class="font-semibold text-white">{{ $customer->source ?? '—' }}</span>
+                                </div>
                             </div>
-                            <div>
-                                <span class="block text-xs text-slate-500">{{ __('Source') }}</span>
-                                <span class="font-semibold text-white">{{ $customer->source ?? '—' }}</span>
-                            </div>
-                        </div>
-                    </a>
+                        </a>
+
+                        @canany(['edit all customers', 'manage crm'])
+                            <form action="{{ route('dashboard.crm.customers.assign', $customer) }}" method="POST" class="mt-4 border-t border-white/10 pt-3">
+                                @csrf
+                                <label for="customer-sales-{{ $customer->id }}" class="mb-1 block text-xs font-semibold text-slate-400">{{ __('Assign to') }}</label>
+                                <select id="customer-sales-{{ $customer->id }}" name="assigned_sales_id" class="form-select w-full rounded-xl text-sm">
+                                    <option value="">{{ __('Unassigned') }}</option>
+                                    @foreach ($users as $id => $name)
+                                        <option value="{{ $id }}" @selected($customer->salesUsers->first()?->id == $id)>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="app-button mt-2 w-full justify-center text-sm">{{ __('Update assignment') }}</button>
+                            </form>
+                        @endcanany
+                    </div>
                 @empty
                     <div class="col-span-full rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-slate-400">
                         <p class="text-lg font-semibold text-white">{{ __('No customers found') }}</p>

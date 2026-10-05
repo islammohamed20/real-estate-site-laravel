@@ -7,21 +7,39 @@ namespace App\Models;
 use App\Support\NotificationRegistry;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements PasskeyUser
 {
+    public const DASHBOARD_SECTIONS = [
+        'dashboard' => 'Dashboard',
+        'crm' => 'CRM',
+        'sales' => 'Sales Team',
+        'projects' => 'Projects',
+        'reports' => 'Reports',
+        'analytics' => 'Site Analytics',
+        'trash' => 'Trash',
+        'users' => 'Users',
+        'banners' => 'Banners',
+        'settings' => 'Settings',
+        'tools' => 'Calculator',
+    ];
+
     use CanResetPassword;
     use HasApiTokens;
     use HasFactory;
     use HasRoles;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use SoftDeletes;
 
     protected $fillable = [
@@ -32,9 +50,11 @@ class User extends Authenticatable
         'phone',
         'job_title',
         'department',
+        'department_id',
         'avatar_path',
         'is_active',
         'notification_preferences',
+        'dashboard_sections',
         'force_logout_at',
         'two_factor_enabled',
         'two_factor_secret',
@@ -48,6 +68,7 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'active_session_id',
     ];
 
     protected function casts(): array
@@ -57,11 +78,23 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'notification_preferences' => 'array',
+            'dashboard_sections' => 'array',
             'two_factor_enabled' => 'boolean',
             'two_factor_recovery_codes' => 'array',
             'force_logout_at' => 'datetime',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    public function hasDashboardSection(string $section): bool
+    {
+        return $this->dashboard_sections === null
+            || in_array($section, $this->dashboard_sections, true);
+    }
+
+    public function departmentRecord(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 
     public function loginHistories(): HasMany
@@ -125,5 +158,34 @@ class User extends Authenticatable
         }
 
         return array_filter($types, fn (array $meta) => $this->hasPermissionTo($meta['permission']));
+    }
+
+    public function rolePermissionNames(): array
+    {
+        return $this->roles
+            ->pluck('permissions')
+            ->flatten()
+            ->pluck('name')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function allPermissionNames(): array
+    {
+        return collect($this->rolePermissionNames())
+            ->merge($this->permissions->pluck('name')->all())
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whether the account requires a second factor (Google Authenticator or Passkey)
+     * before accessing the dashboard.
+     */
+    public function needsSecondFactor(): bool
+    {
+        return $this->two_factor_enabled || $this->passkeys()->exists();
     }
 }

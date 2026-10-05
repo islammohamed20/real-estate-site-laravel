@@ -130,6 +130,8 @@ class DataTransferController extends Controller
 
         $created = 0;
         $updated = 0;
+        $canUpdateAll = auth()->user()->hasAnyPermission(['view all '.$type, 'manage crm']);
+
         foreach ($rows as $values) {
             $data = [];
             foreach ($columns as $index => $column) {
@@ -138,14 +140,22 @@ class DataTransferController extends Controller
             if (empty($data['phone'])) continue;
 
             if ($type === 'leads') {
-                $existing = Lead::query()->where('phone', $data['phone'])->latest('id')->first();
+                $existingQuery = Lead::query()->where('phone', $data['phone']);
+                if (! $canUpdateAll) {
+                    $existingQuery->where('assigned_sales_id', auth()->id());
+                }
+                $existing = $existingQuery->latest('id')->first();
                 $data['stage'] = $data['stage'] ?? LeadStage::New->value;
                 $data['status'] = $data['status'] ?? 'active';
                 $data['source'] = $data['source'] ?? 'import';
                 if ($existing) { $existing->update($data); $updated++; }
                 else { Lead::query()->create($data); $created++; }
             } else {
-                $existing = Customer::query()->where('phone', $data['phone'])->first();
+                $existingQuery = Customer::query()->where('phone', $data['phone']);
+                if (! $canUpdateAll) {
+                    $existingQuery->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id()));
+                }
+                $existing = $existingQuery->first();
                 $data['source'] = $data['source'] ?? 'import';
                 if ($existing) { $existing->update($data); $updated++; }
                 else { Customer::query()->create($data); $created++; }

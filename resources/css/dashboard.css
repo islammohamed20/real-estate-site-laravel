@@ -2,7 +2,7 @@
    DASHBOARD UI v2 — Premium Glassmorphism design system
    Scoped under `.dash-ui` (dashboard body only). The public site is
    never affected. Built from 2026 award-winning dashboard patterns:
-   frosted-glass cards, luminous indigo→cyan accents, deep navy base,
+   frosted-glass cards, luminous blue→cyan accents, deep navy base,
    micro-interactions, refined data tables.
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -38,29 +38,30 @@
 
 /* Dark mode */
 .dark .dash-ui {
-  --slate-50: 226 232 255;
-  --slate-100: 219 226 246;
-  --slate-200: 191 200 224;
-  --slate-300: 148 163 194;
-  --slate-400: 100 116 148;
-  --slate-500: 71 85 110;
-  --slate-600: 51 65 88;
-  --slate-700: 33 44 66;
-  --slate-800: 20 29 48;
-  --slate-900: 13 20 36;
-  --slate-950: 8 12 24;
+  --slate-50: 239 246 255;
+  --slate-100: 219 234 254;
+  --slate-200: 191 219 254;
+  --slate-300: 147 181 226;
+  --slate-400: 103 137 181;
+  --slate-500: 71 99 138;
+  --slate-600: 44 70 105;
+  --slate-700: 27 50 82;
+  --slate-800: 15 36 65;
+  --slate-900: 10 27 51;
+  --slate-950: 5 17 35;
 
-  --brand-50: 238 242 255;
-  --brand-100: 224 231 255;
-  --brand-200: 199 210 254;
-  --brand-300: 165 180 252;
-  --brand-400: 129 140 248;
-  --brand-500: 99 102 241;
-  --brand-600: 79 70 229;
-  --brand-700: 67 56 202;
-  --brand-800: 55 48 163;
-  --brand-900: 49 46 129;
-  --brand-950: 30 27 75;
+  /* Dashboard identity: clear Azure blue instead of indigo/violet. */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 147 197 253;
+  --brand-400: 96 165 250;
+  --brand-500: 59 130 246;
+  --brand-600: 37 99 235;
+  --brand-700: 29 78 216;
+  --brand-800: 30 64 175;
+  --brand-900: 30 58 138;
+  --brand-950: 23 37 84;
 }
 
 /* ── Ambient backdrop ───────────────────────────────────────────── */
@@ -77,8 +78,8 @@
 .dark .dash-ui {
   background:
     radial-gradient(1100px 520px at 85% -10%, rgb(var(--brand-500) / 0.20), transparent 60%),
-    radial-gradient(900px 480px at -10% 10%, rgb(34 211 238 / 0.12), transparent 55%),
-    radial-gradient(800px 600px at 50% 115%, rgb(139 92 246 / 0.16), transparent 60%),
+    radial-gradient(900px 480px at -10% 10%, rgb(14 165 233 / 0.14), transparent 55%),
+    radial-gradient(800px 600px at 50% 115%, rgb(37 99 235 / 0.14), transparent 60%),
     rgb(var(--slate-950));
   background-attachment: fixed;
 }
@@ -226,7 +227,7 @@
 .dash-ui .app-card--gradient {
   background:
     radial-gradient(120% 90% at 100% 0%, rgb(var(--brand-500) / 0.16), transparent 55%),
-    radial-gradient(100% 80% at 0% 100%, rgb(139 92 246 / 0.12), transparent 55%),
+    radial-gradient(100% 80% at 0% 100%, rgb(14 165 233 / 0.12), transparent 55%),
     rgb(var(--slate-900));
 }
 
@@ -281,16 +282,40 @@
 
 .dash-ui .app-input,
 .dash-ui .app-select,
-.dash-ui .app-textarea {
-  background: rgb(var(--white) / 0.045);
+.dash-ui .app-textarea,
+.dash-ui .form-select,
+.dash-ui .form-input,
+.dash-ui .form-textarea {
+  background-color: rgb(var(--slate-900) / 0.72);
+  color: rgb(var(--slate-100));
   border-color: rgb(var(--white) / 0.09);
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15);
+  color-scheme: light;
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark .dash-ui .app-input,
+.dark .dash-ui .app-select,
+.dark .dash-ui .app-textarea,
+.dark .dash-ui .form-select,
+.dark .dash-ui .form-input,
+.dark .dash-ui .form-textarea {
+  color-scheme: dark;
+}
+
+.dash-ui .form-select option,
+.dash-ui .form-input option,
+.dash-ui select option {
+  background-color: rgb(var(--slate-900));
+  color: rgb(var(--slate-100));
 }
 
 .dash-ui .app-input:focus,
 .dash-ui .app-select:focus,
-.dash-ui .app-textarea:focus {
+.dash-ui .app-textarea:focus,
+.dash-ui .form-select:focus,
+.dash-ui .form-input:focus,
+.dash-ui .form-textarea:focus {
   border-color: rgb(var(--brand-500) / 0.7);
   box-shadow: 0 0 0 4px rgb(var(--brand-500) / 0.15), inset 0 1px 2px rgb(0 0 0 / 0.1);
   background: rgb(var(--white) / 0.07);
@@ -327,7 +352,7 @@
 /* ── Icon tiles ─────────────────────────────────────────────────── */
 
 .dash-ui .icon-tile {
-  background: linear-gradient(135deg, rgb(var(--brand-500) / 0.22), rgb(139 92 246 / 0.14));
+  background: linear-gradient(135deg, rgb(var(--brand-500) / 0.24), rgb(14 165 233 / 0.16));
   box-shadow: inset 0 1px 0 rgb(var(--white) / 0.12), 0 4px 14px -6px rgb(var(--brand-500) / 0.5);
 }
 

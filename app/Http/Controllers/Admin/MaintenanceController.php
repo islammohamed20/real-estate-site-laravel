@@ -20,7 +20,10 @@ class MaintenanceController extends Controller
         \App\Models\AutomationSetting::ensureDefaults();
         $backupDir = app(BackupDatabase::class)->backupDirectory();
 
-        $backups = collect(glob(rtrim($backupDir, '/').'/*.sql.gz') ?: [])
+        $backups = collect(array_merge(
+            glob(rtrim($backupDir, '/').'/*.sql.gz') ?: [],
+            glob(rtrim($backupDir, '/').'/*.full.tar.gz') ?: [],
+        ))
             ->map(fn (string $file) => [
                 'name' => basename($file),
                 'size' => (int) filesize($file),
@@ -74,6 +77,17 @@ class MaintenanceController extends Controller
         return back()->with('status', $output ?: __('Database backup created.'));
     }
 
+    public function createFullBackup(): RedirectResponse
+    {
+        $exitCode = Artisan::call('backup:database', ['--full' => true]);
+        $output = trim(Artisan::output());
+
+        if ($exitCode !== 0) {
+            return back()->withErrors(['backup' => $output ?: __('Full backup failed.')]);
+        }
+
+        return back()->with('status', $output ?: __('Full backup created.'));
+    }
     public function download(Request $request): BinaryFileResponse
     {
         $file = $this->resolveBackupFile((string) $request->route('file'));

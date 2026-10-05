@@ -49,7 +49,15 @@
                     <a href="{{ route('password.request') }}" class="text-sm text-brand-400 transition hover:text-brand-300">{{ __('Forgot your password?') }}</a>
                 </div>
 
+                <div class="stagger-item" style="animation-delay:500ms">
+                    @include('partials.turnstile')
+                </div>
+
                 <button type="submit" class="stagger-item app-button w-full transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:520ms">{{ __('Sign in') }}</button>
+
+                <button type="button" id="passkey-signin" class="stagger-item hidden w-full app-button--ghost transition-transform duration-300 hover:scale-[1.02] active:scale-[0.97]" style="animation-delay:540ms">
+                    {{ __('Sign in with passkey') }}
+                </button>
             </form>
         </div>
 

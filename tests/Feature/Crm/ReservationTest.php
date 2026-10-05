@@ -9,6 +9,7 @@ use App\Models\Lead;
 use App\Models\Reservation;
 use App\Models\Unit;
 use App\Models\User;
+use App\Enums\UnitStatus;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -122,5 +123,72 @@ class ReservationTest extends TestCase
             'phone' => '01005554567',
             'name' => $lead->name,
         ]);
+    }
+
+    public function test_unit_cannot_have_two_active_reservations(): void
+    {
+        $unit = Unit::factory()->create(['status' => UnitStatus::Available]);
+        Reservation::factory()->create(['unit_id' => $unit->id, 'status' => 'pending']);
+
+        $this->actingAs($this->user)
+            ->from(route('dashboard.crm.reservations.create'))
+            ->post(route('dashboard.crm.reservations.store'), [
+                'customer_id' => Customer::factory()->create()->id,
+                'unit_id' => $unit->id,
+                'deposit_amount' => 50000,
+                'status' => 'pending',
+            ])
+            ->assertSessionHasErrors('unit_id');
+
+        $this->assertSame(1, Reservation::query()->where('unit_id', $unit->id)->count());
+    }
+
+    public function test_sold_unit_cannot_be_reserved(): void
+    {
+        $unit = Unit::factory()->create(['status' => UnitStatus::Sold]);
+
+        $this->actingAs($this->user)
+            ->post(route('dashboard.crm.reservations.store'), [
+                'customer_id' => Customer::factory()->create()->id,
+                'unit_id' => $unit->id,
+                'deposit_amount' => 50000,
+                'status' => 'pending',
+            ])
+            ->assertSessionHasErrors('unit_id');
+
+        $this->assertDatabaseMissing('reservations', ['unit_id' => $unit->id]);
+    }
+
+    public function test_moving_reservation_releases_previous_unit(): void
+    {
+        $oldUnit = Unit::factory()->create(['status' => UnitStatus::Available]);
+        $newUnit = Unit::factory()->create(['status' => UnitStatus::Available]);
+        $reservation = Reservation::factory()->create(['unit_id' => $oldUnit->id, 'status' => 'pending']);
+
+        $this->actingAs($this->user)
+            ->put(route('dashboard.crm.reservations.update', $reservation), [
+                'customer_id' => $reservation->customer_id,
+                'unit_id' => $newUnit->id,
+                'deposit_amount' => 50000,
+                'status' => 'pending',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(UnitStatus::Available, $oldUnit->fresh()->status);
+        $this->assertSame(UnitStatus::Reserved, $newUnit->fresh()->status);
+    }
+
+    public function test_deleting_active_reservation_releases_unit(): void
+    {
+        $unit = Unit::factory()->create(['status' => UnitStatus::Available]);
+        $reservation = Reservation::factory()->create(['unit_id' => $unit->id, 'status' => 'pending']);
+
+        $this->assertSame(UnitStatus::Reserved, $unit->fresh()->status);
+
+        $this->actingAs($this->user)
+            ->delete(route('dashboard.crm.reservations.destroy', $reservation))
+            ->assertRedirect();
+
+        $this->assertSame(UnitStatus::Available, $unit->fresh()->status);
     }
 }

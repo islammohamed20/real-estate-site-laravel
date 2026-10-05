@@ -1,6 +1,17 @@
 @extends('layouts.dashboard')
 
 @section('content')
+    @php
+        $unitDefaultLat = '30.0444';
+        $unitDefaultLng = '31.2357';
+        $unitMapLat = (string) old('map_lat', $unit?->map_lat ?? $unitDefaultLat);
+        $unitMapLng = (string) old('map_lng', $unit?->map_lng ?? $unitDefaultLng);
+        $unitMapUrl = function (string $lat, string $lng): string {
+            return 'https://www.google.com/maps?q=' . urlencode($lat . ',' . $lng) . '&z=15&output=embed';
+        };
+        $unitInitialMapSrc = $unitMapUrl($unitMapLat, $unitMapLng);
+    @endphp
+
     <div class="space-y-6">
         <section class="dashboard-hero-card p-6 sm:p-8">
             <div class="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-brand-500/20 blur-3xl"></div>
@@ -17,12 +28,18 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <a href="{{ route('dashboard.projects.index') }}" class="app-button--ghost">{{ __('Cancel') }}</a>
-                    <button type="submit" form="unit-form" class="app-button">
+                    <button
+                        type="submit"
+                        form="unit-form"
+                        formaction="{{ $unit ? route('dashboard.projects.units.update', [$project, $unit]) : route('dashboard.projects.units.store', $project) }}"
+                        formmethod="POST"
+                        class="app-button"
+                    >
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" stroke-width="1.8"/><path d="M17 21v-8H7v8M7 3v5h8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         {{ $unit ? __('Update Unit') : __('Create Unit') }}
                     </button>
                     @if ($unit && auth()->user()?->can('delete', $unit))
-                        <button type="button" onclick="confirmAction('{{ __('Delete unit') }}', '{{ __('Are you sure you want to delete unit :num? Any related offers, reservations, or deals must be removed first.', ['num' => $unit->unit_number]) }}', () => document.getElementById('delete-unit-form-{{ $unit->id }}').submit(), '{{ __('Delete') }}')" class="app-button app-button--danger">
+                        <button type="button" onclick="confirmAction('{{ __('Delete unit') }}', '{{ __('Are you sure you want to delete unit :num? Any related offers, reservations, or deals must be removed first.', ['num' => $unit->unit_number]) }}', () => document.getElementById('delete-unit-form-{{ $unit->id }}').submit(), '{{ __('Delete') }}', true)" class="app-button app-button--danger">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8" stroke-linecap="round"/></svg>
                             {{ __('Delete Unit') }}
                         </button>
@@ -157,7 +174,7 @@
                         <div class="space-y-3">
                             <div>
                                 <label for="status" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Current Status') }} <span class="text-rose-400">*</span></label>
-                                <select id="status" name="status" class="app-select" required>
+                                <select id="status" name="status" class="app-select" required @change="$refs.hideWebsite.checked = $event.target.value !== 'available'">
                                     @foreach($statuses as $value => $label)
                                         <option value="{{ $value }}" @selected(old('status', $unit?->status?->value ?? 'available') === $value)>{{ $label }}</option>
                                     @endforeach
@@ -179,7 +196,7 @@
                                     <p class="text-xs text-slate-400">{{ __('Internal management only') }}</p>
                                 </div>
                                 <input type="hidden" name="hidden_from_website" value="0">
-                                <input type="checkbox" name="hidden_from_website" value="1" @checked(old('hidden_from_website', $unit?->hidden_from_website)) class="h-5 w-5 shrink-0 rounded border-white/10 bg-slate-900 text-brand-600 focus:ring-brand-500/20">
+                                <input type="checkbox" name="hidden_from_website" x-ref="hideWebsite" value="1" @checked(old('hidden_from_website', $unit?->hidden_from_website)) class="h-5 w-5 shrink-0 rounded border-white/10 bg-slate-900 text-brand-600 focus:ring-brand-500/20">
                             </label>
 
                             <div>
@@ -353,7 +370,7 @@
                         <h2 class="text-lg font-semibold text-white">{{ __('Photos & Map') }}</h2>
                     </div>
 
-                    <div class="space-y-3" x-data="{ mapLat: '{{ old('map_lat', $unit?->map_lat) }}', mapLng: '{{ old('map_lng', $unit?->map_lng) }}' }">
+                    <div class="space-y-5">
                         <div>
                             @include('dashboard.partials.image-uploader', [
                                 'compact' => true,
@@ -365,62 +382,103 @@
                             ])
                         </div>
 
-                    {{-- Floor plan (horizontal projection) --}}
-                    @php
-                        $floorPlanPath = $unit?->floor_plan_path;
-                        $floorPlanExt = $floorPlanPath ? strtolower(pathinfo($floorPlanPath, PATHINFO_EXTENSION)) : null;
-                        $floorPlanIsImage = in_array($floorPlanExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'], true);
-                    @endphp
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <div class="mb-2 flex items-center gap-2">
-                            <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z" stroke-width="1.8"/><path d="M4 12h16M12 4v16M7 12v8M17 12v8" stroke-width="1.8"/></svg>
-                            <h3 class="text-sm font-semibold text-white">{{ __('Floor Plan') }}</h3>
-                        </div>
-                        <p class="mb-3 text-xs text-slate-500">{{ __('Upload the unit floor plan — an image, PDF, DWG or DXF file. It is shown to visitors in the project page preview.') }}</p>
-                        <input type="file" id="floor_plan" name="floor_plan" accept="image/*,.pdf,.dwg,.dxf,.dgn,.rvt,.skp,.stp,.step" class="app-input file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-brand-500">
-                        @error('floor_plan') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                        {{-- Unit Location / Map --}}
+                        <div class="space-y-3" id="unit-map-block">
+                            <div class="flex items-center gap-2">
+                                <svg class="h-5 w-5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke-width="1.8"/><circle cx="12" cy="10" r="3" stroke-width="1.8"/></svg>
+                                <h3 class="text-sm font-semibold text-white">{{ __('Unit Location') }}</h3>
+                            </div>
 
-                        @if ($floorPlanPath)
-                            <div class="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
-                                @if ($floorPlanIsImage)
-                                    <img src="{{ asset('storage/'.$floorPlanPath) }}" alt="{{ __('Floor Plan') }}" class="max-h-56 w-full object-contain">
-                                @else
-                                    <div class="flex items-center gap-3 p-4">
-                                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400">
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.8"/><path d="M14 2v6h6" stroke-width="1.8"/><path d="M9 15h6M9 11h2" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-semibold text-white">{{ basename($floorPlanPath) }}</p>
-                                            <p class="text-xs text-slate-500">{{ strtoupper($floorPlanExt ?? '') }} — {{ __('Floor Plan') }}</p>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="map_lat" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Latitude') }}</label>
+                                    <input type="text" id="map_lat" name="map_lat" class="app-input" value="{{ $unitMapLat }}" placeholder="e.g. 30.0444">
+                                    @error('map_lat') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label for="map_lng" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Longitude') }}</label>
+                                    <input type="text" id="map_lng" name="map_lng" class="app-input" value="{{ $unitMapLng }}" placeholder="e.g. 31.2357">
+                                    @error('map_lng') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-slate-500">{{ __('Map preview') }} — {{ __('right-click on the map to copy coordinates') }}</p>
+                            <div class="overflow-hidden rounded-2xl border border-white/10">
+                                <iframe
+                                    id="unit-map-iframe"
+                                    src="{{ $unitInitialMapSrc }}"
+                                    class="h-64 w-full bg-slate-900"
+                                    loading="eager"
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                ></iframe>
+                            </div>
+                            <p class="text-[10px] text-slate-600">
+                                {{ __('The map preview uses Google Maps and does not require an API key.') }}
+                            </p>
+                        </div>
+
+                        {{-- Floor plan (horizontal projection) --}}
+                        @php
+                            $floorPlanPath = $unit?->floor_plan_path;
+                            $floorPlanExt = $floorPlanPath ? strtolower(pathinfo($floorPlanPath, PATHINFO_EXTENSION)) : null;
+                            $floorPlanIsImage = in_array($floorPlanExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'], true);
+                        @endphp
+                        <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <div class="mb-2 flex items-center gap-2">
+                                <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z" stroke-width="1.8"/><path d="M4 12h16M12 4v16M7 12v8M17 12v8" stroke-width="1.8"/></svg>
+                                <h3 class="text-sm font-semibold text-white">{{ __('Floor Plan') }}</h3>
+                            </div>
+                            <p class="mb-3 text-xs text-slate-500">{{ __('Upload the unit floor plan — an image, PDF, DWG or DXF file. It is shown to visitors in the project page preview.') }}</p>
+                            <input type="file" id="floor_plan" name="floor_plan" accept="image/*,.pdf,.dwg,.dxf,.dgn,.rvt,.skp,.stp,.step" class="app-input file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-brand-500">
+                            @error('floor_plan') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+
+                            @if ($floorPlanPath)
+                                <div class="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
+                                    @if ($floorPlanIsImage)
+                                        <img src="{{ asset('storage/'.$floorPlanPath) }}" alt="{{ __('Floor Plan') }}" class="max-h-56 w-full object-contain">
+                                    @else
+                                        <div class="flex items-center gap-3 p-4">
+                                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400">
+                                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="1.8"/><path d="M14 2v6h6" stroke-width="1.8"/><path d="M9 15h6M9 11h2" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                            </span>
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-semibold text-white">{{ basename($floorPlanPath) }}</p>
+                                                <p class="text-xs text-slate-500">{{ strtoupper($floorPlanExt ?? '') }} — {{ __('Floor Plan') }}</p>
+                                            </div>
+                                            <a href="{{ asset('storage/'.$floorPlanPath) }}" target="_blank" rel="noopener noreferrer" class="app-button--ghost ms-auto shrink-0 px-3 py-1.5 text-xs">{{ __('Open') }}</a>
                                         </div>
-                                        <a href="{{ asset('storage/'.$floorPlanPath) }}" target="_blank" rel="noopener noreferrer" class="app-button--ghost ms-auto shrink-0 px-3 py-1.5 text-xs">{{ __('Open') }}</a>
-                                    </div>
-                                @endif
-                            </div>
-                            <label class="mt-3 flex cursor-pointer items-center gap-2 text-xs text-slate-400 transition hover:text-rose-300">
-                                <input type="checkbox" name="remove_floor_plan" value="1" class="h-4 w-4 rounded border-white/10 bg-slate-900 text-rose-600 focus:ring-rose-500/20">
-                                {{ __('Remove floor plan') }}
-                            </label>
-                        @endif
-                    </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="map_lat" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Latitude') }}</label>
-                                <input type="text" id="map_lat" name="map_lat" class="app-input" x-model="mapLat" placeholder="e.g. 30.0444">
-                                @error('map_lat') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="map_lng" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Longitude') }}</label>
-                                <input type="text" id="map_lng" name="map_lng" class="app-input" x-model="mapLng" placeholder="e.g. 31.2357">
-                                @error('map_lng') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
-                            </div>
+                                    @endif
+                                </div>
+                                <label class="mt-3 flex cursor-pointer items-center gap-2 text-xs text-slate-400 transition hover:text-rose-300">
+                                    <input type="checkbox" name="remove_floor_plan" value="1" class="h-4 w-4 rounded border-white/10 bg-slate-900 text-rose-600 focus:ring-rose-500/20">
+                                    {{ __('Remove floor plan') }}
+                                </label>
+                            @endif
                         </div>
 
-                        <p class="text-xs text-slate-500">{{ __('Google Maps location') }} — {{ __('right-click on Google Maps to copy coordinates') }}</p>
-                        <div class="overflow-hidden rounded-2xl border border-white/10">
-                            <iframe :src="'https://www.google.com/maps?q=' + (mapLat || '30.0444') + ',' + (mapLng || '31.2357') + '&z=15&output=embed'" class="h-40 w-full" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-                        </div>
+                        <script>
+                            (function () {
+                                const latInput = document.getElementById('map_lat');
+                                const lngInput = document.getElementById('map_lng');
+                                const iframe = document.getElementById('unit-map-iframe');
+
+                                if (!latInput || !lngInput || !iframe) return;
+
+                                function buildUrl(lat, lng) {
+                                    const safeLat = (lat || '').trim() || '{{ $unitDefaultLat }}';
+                                    const safeLng = (lng || '').trim() || '{{ $unitDefaultLng }}';
+
+                                    return 'https://www.google.com/maps?q=' + encodeURIComponent(safeLat + ',' + safeLng) + '&z=15&output=embed';
+                                }
+
+                                function updateMap() {
+                                    iframe.src = buildUrl(latInput.value, lngInput.value);
+                                }
+
+                                latInput.addEventListener('input', updateMap);
+                                lngInput.addEventListener('input', updateMap);
+                            })();
+                        </script>
                     </div>
                     </section>
                 </div>

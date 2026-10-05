@@ -28,7 +28,6 @@ class UserProfileController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:50'],
             'job_title' => ['nullable', 'string', 'max:255'],
-            'department' => ['nullable', 'string', 'max:255'],
             'avatar_path' => ['nullable', 'string', 'max:500'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
@@ -38,7 +37,6 @@ class UserProfileController extends Controller
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'job_title' => $validated['job_title'] ?? null,
-            'department' => $validated['department'] ?? null,
             'avatar_path' => $validated['avatar_path'] ?? null,
         ];
 

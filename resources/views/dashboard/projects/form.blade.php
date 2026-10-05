@@ -3,6 +3,13 @@
 @section('content')
     @php
         $errors = $errors ?? new \Illuminate\Support\ViewErrorBag();
+        $projectMapLat = old('map_lat', $project ? $project->map_lat : null);
+        $projectMapLng = old('map_lng', $project ? $project->map_lng : null);
+        $projectMapHasCoordinates = is_numeric($projectMapLat) && is_numeric($projectMapLng);
+        $projectMapQuery = $projectMapHasCoordinates ? $projectMapLat . ',' . $projectMapLng : null;
+        $projectMapUrl = $projectMapHasCoordinates
+            ? 'https://www.google.com/maps?q=' . urlencode((string) $projectMapQuery) . '&z=15&output=embed'
+            : 'about:blank';
         $buildingsData = $project ? $project->buildings->map(function ($b) use ($project) {
             $floors = $b->floors->map(function ($f) use ($project, $b) {
                 $units = $f->units->map(function ($u) use ($project) {
@@ -30,7 +37,7 @@
                         'featured' => (bool) $u->featured,
                         'image_url' => $img ? asset('storage/'.$img) : null,
                         'edit_url' => route('dashboard.projects.units.edit', [$project, $u]),
-                        'public_url' => route('public.units.show', $u->unit_number),
+                        'public_url' => route('public.units.show', $u->id),
                         'delete_id' => 'delete-unit-' . $u->id,
                     ];
                 })->values()->all();
@@ -161,6 +168,13 @@
                         @error('status') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
                     </div>
 
+                    <div>
+                        <label for="current_phase" class="mb-2 block text-sm font-medium text-slate-300">{{ __('المرحلة الحالية') }}</label>
+                        <input type="text" id="current_phase" name="current_phase" class="app-input" value="{{ old('current_phase', $project?->current_phase) }}" placeholder="{{ __('مثال: المرحلة الأولى - تسليم 2027') }}">
+                        <p class="mt-1.5 text-xs text-slate-500">{{ __('تظهر هذه المرحلة للجمهور في صفحة المشروع العامة.') }}</p>
+                        @error('current_phase') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                    </div>
+
                     <div class="sm:col-span-2" x-data="{ slug: '{{ old('slug', $project?->slug) }}' }">
                         <label for="slug" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Project URL (slug)') }}</label>
                         <div class="flex items-center gap-2">
@@ -184,6 +198,13 @@
                         <label for="price_per_meter" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Default Price per m² (EGP)') }}</label>
                         <input type="number" step="0.01" min="0" id="price_per_meter" name="price_per_meter" class="app-input" value="{{ old('price_per_meter', $project?->price_per_meter) }}" placeholder="0.00">
                         @error('price_per_meter') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label for="max_installment_years" class="mb-2 block text-sm font-medium text-slate-300">{{ __('Maximum Installment Years') }}</label>
+                        <input type="number" step="1" min="1" max="50" id="max_installment_years" name="max_installment_years" class="app-input" value="{{ old('max_installment_years', $project?->max_installment_years ?? 5) }}" required>
+                        <p class="mt-1.5 text-xs text-slate-500">{{ __('This limit is applied automatically in the installment calculator for this project.') }}</p>
+                        @error('max_installment_years') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -220,6 +241,88 @@
                         <input type="text" id="country" name="country" class="app-input" value="{{ old('country', $project?->country) }}">
                     </div>
 
+                    <div class="sm:col-span-2 space-y-3 border-t border-white/5 pt-4" id="project-map-block">
+                        <div class="flex items-center gap-2">
+                            <svg class="h-5 w-5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z" stroke-width="1.8"/><circle cx="12" cy="10" r="3" stroke-width="1.8"/></svg>
+                            <h3 class="text-sm font-semibold text-white">{{ __('موقع المشروع على خرائط جوجل') }}</h3>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="project_map_lat" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Latitude') }}</label>
+                                <input type="number" step="any" min="-90" max="90" id="project_map_lat" name="map_lat" class="app-input" value="{{ old('map_lat', $project ? $project->map_lat : null) }}" placeholder="e.g. 30.0444">
+                                @error('map_lat') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label for="project_map_lng" class="mb-1.5 block text-sm font-medium text-slate-300">{{ __('Longitude') }}</label>
+                                <input type="number" step="any" min="-180" max="180" id="project_map_lng" name="map_lng" class="app-input" value="{{ old('map_lng', $project ? $project->map_lng : null) }}" placeholder="e.g. 31.2357">
+                                @error('map_lng') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-slate-500">{{ __('right-click on Google Maps to copy coordinates') }}</p>
+                        <div id="project-map-empty" class="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 px-4 py-8 text-center text-xs text-slate-500{{ $projectMapHasCoordinates ? ' hidden' : '' }}">
+                            {{ __('Enter both coordinates to preview the project location.') }}
+                        </div>
+                        <div class="overflow-hidden rounded-2xl border border-white/10{{ $projectMapHasCoordinates ? '' : ' hidden' }}">
+                            <iframe
+                                id="project-map-iframe"
+                                src="{{ $projectMapUrl }}"
+                                class="h-64 w-full bg-slate-900"
+                                loading="eager"
+                                referrerpolicy="no-referrer-when-downgrade"
+                            ></iframe>
+                        </div>
+                        <a id="project-map-link" href="{{ $projectMapHasCoordinates ? 'https://www.google.com/maps?q=' . urlencode((string) $projectMapQuery) : '#' }}" target="_blank" rel="noopener noreferrer" class="app-button--ghost inline-flex{{ $projectMapHasCoordinates ? '' : ' hidden' }}">
+                            {{ __('View on Google Maps') }}
+                        </a>
+                        <p class="text-[10px] text-slate-600">{{ __('The map preview uses Google Maps and does not require an API key.') }}</p>
+
+                        <script>
+                            (function () {
+                                const latInput = document.getElementById('project_map_lat');
+                                const lngInput = document.getElementById('project_map_lng');
+                                const iframe = document.getElementById('project-map-iframe');
+                                const emptyState = document.getElementById('project-map-empty');
+                                const mapContainer = iframe ? iframe.parentElement : null;
+                                const mapLink = document.getElementById('project-map-link');
+
+                                if (!latInput || !lngInput || !iframe || !emptyState || !mapContainer || !mapLink) return;
+
+                                function getCoordinates() {
+                                    const latValue = latInput.value.trim();
+                                    const lngValue = lngInput.value.trim();
+                                    const lat = Number(latValue);
+                                    const lng = Number(lngValue);
+
+                                    if (!latValue || !lngValue || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                                        return null;
+                                    }
+
+                                    return { lat: latValue, lng: lngValue };
+                                }
+
+                                function updateMap() {
+                                    const coordinates = getCoordinates();
+                                    const hasCoordinates = coordinates !== null;
+
+                                    emptyState.classList.toggle('hidden', hasCoordinates);
+                                    mapContainer.classList.toggle('hidden', !hasCoordinates);
+                                    mapLink.classList.toggle('hidden', !hasCoordinates);
+
+                                    if (!hasCoordinates) return;
+
+                                    const query = coordinates.lat + ',' + coordinates.lng;
+                                    iframe.src = 'https://www.google.com/maps?q=' + encodeURIComponent(query) + '&z=15&output=embed';
+                                    mapLink.href = 'https://www.google.com/maps?q=' + encodeURIComponent(query);
+                                }
+
+                                latInput.addEventListener('input', updateMap);
+                                lngInput.addEventListener('input', updateMap);
+                            })();
+                        </script>
+                    </div>
+
                     {{-- Cover Image --}}
                     <div class="sm:col-span-2 space-y-3 pt-2 border-t border-white/5">
                         <label class="block text-sm font-medium text-slate-300">{{ __('Main Project Cover Image') }}</label>
@@ -229,6 +332,17 @@
                                 <img src="{{ asset('storage/'.$project->cover_image_path) }}" alt="{{ $project->name }}" class="h-36 w-full object-cover">
                             </div>
                         @endif
+                    </div>
+
+                    {{-- Project Image Gallery (drag & drop) --}}
+                    <div class="sm:col-span-2 pt-2 border-t border-white/5">
+                        @include('dashboard.partials.image-uploader', [
+                            'label' => __('Project Gallery Images'),
+                            'existing' => $project?->images,
+                            'selectable' => true,
+                            'selected' => in_array($project?->cover_image_path, $project?->images ?? [], true) ? $project->cover_image_path : null,
+                            'inputName' => 'main_image',
+                        ])
                     </div>
                 </div>
             </section>
@@ -246,7 +360,7 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" @click="buildings.push({ id: '', name: '{{ __('Building') }} ' + (buildings.length + 1), floors_count: 5 }); open = true" class="app-button--ghost !py-2 text-xs">
+                        <button type="button" @click="buildings.push({ id: '', name: '{{ __('Building') }} ' + (buildings.length + 1), floors_count: 5, hidden_from_website: false }); open = true" class="app-button--ghost !py-2 text-xs">
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round"/></svg>
                             {{ __('+ Add Building') }}
                         </button>
@@ -279,6 +393,12 @@
                                     <input type="number" :id="'building_floors_' + index" :name="'buildings[' + index + '][floors_count]'" x-model.number="building.floors_count" class="app-input w-full text-xs text-center" min="1" max="10" required>
                                 </div>
                             </div>
+
+                            <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] p-2.5 transition hover:bg-white/[0.06]" :class="building.hidden_from_website ? 'border-rose-500/30 bg-rose-500/10' : ''">
+                                <input type="hidden" :name="'buildings[' + index + '][hidden_from_website]'" :value="building.hidden_from_website ? 1 : 0">
+                                <input type="checkbox" x-model="building.hidden_from_website" class="h-4 w-4 rounded border-white/10 bg-slate-900 text-brand-600 focus:ring-brand-500/20">
+                                <span class="text-[11px] font-semibold" :class="building.hidden_from_website ? 'text-rose-300' : 'text-slate-300'" x-text="building.hidden_from_website ? '{{ __('Hidden from website') }}' : '{{ __('Visible on website') }}'"></span>
+                            </label>
                         </div>
                     </template>
                 </div>
@@ -614,7 +734,7 @@
                                     <td class="px-4 py-3"><span class="badge {{ $statusClass }}">{{ $statusLabel }}</span></td>
                                     <td class="px-4 py-3 text-right">
                                         <div class="flex items-center justify-end gap-2">
-                                            <a href="{{ route('public.units.show', $unit->unit_number) }}" target="_blank" class="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition text-xs" title="{{ __('View') }}">
+                                            <a href="{{ route('public.units.show', $unit->id) }}" target="_blank" class="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition text-xs" title="{{ __('View') }}">
                                                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke-width="1.8"/></svg>
                                             </a>
                                             <a href="{{ route('dashboard.projects.units.edit', [$project, $unit]) }}" class="app-button !py-1.5 !px-3 text-xs">{{ __('Edit') }}</a>
@@ -622,7 +742,7 @@
                                                 @csrf
                                                 @method('DELETE')
                                                 @can('delete', $unit)
-                                                    <button type="button" onclick="confirmAction('{{ __('Delete unit') }}', '{{ __('Are you sure you want to delete unit :num?', ['num' => $unit->unit_number]) }}', () => document.getElementById('delete-unit-{{ $unit->id }}').submit(), '{{ __('Delete') }}')" class="app-button app-button--danger !py-1.5 !px-2.5 text-xs">{{ __('Delete') }}</button>
+                                                    <button type="button" onclick="confirmAction('{{ __('Delete unit') }}', '{{ __('Are you sure you want to delete unit :num?', ['num' => $unit->unit_number]) }}', () => document.getElementById('delete-unit-{{ $unit->id }}').submit(), '{{ __('Delete') }}', true)" class="app-button app-button--danger !py-1.5 !px-2.5 text-xs">{{ __('Delete') }}</button>
                                                 @endcan
                                             </form>
                                         </div>

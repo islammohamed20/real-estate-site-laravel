@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\GeminiUsageLog;
 use App\Models\LoginHistory;
 use App\Models\OtpLog;
 use App\Models\VisitorLog;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class AnalyticsController extends Controller
@@ -101,6 +103,46 @@ class AnalyticsController extends Controller
             ->limit(60)
             ->get();
 
+        // ===== Gemini AI usage (WhatsApp agent) =====
+        $aiSince = now()->subDays(13)->startOfDay();
+        $aiTotals = [
+            'requests' => GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->count(),
+            'successful' => GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->where('success', true)->count(),
+            'failed' => GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->where('success', false)->count(),
+            'prompt_tokens' => (int) GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->sum('prompt_tokens'),
+            'output_tokens' => (int) GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->sum('output_tokens'),
+            'thoughts_tokens' => (int) GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->sum('thoughts_tokens'),
+            'total_tokens' => (int) GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->sum('total_tokens'),
+            'avg_latency' => (int) GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->whereNotNull('latency_ms')->avg('latency_ms'),
+            'unique_customers' => GeminiUsageLog::query()->where('created_at', '>=', $aiSince)->whereNotNull('phone')->distinct()->count('phone'),
+        ];
+
+        $aiDaily = GeminiUsageLog::query()
+            ->where('created_at', '>=', $aiSince)
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('COUNT(*) as requests'),
+                DB::raw('SUM(total_tokens) as total_tokens'),
+            )
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->pluck('requests', 'date');
+
+        $aiRecentLogs = GeminiUsageLog::query()
+            ->where('created_at', '>=', $aiSince)
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
+        $aiTopCustomers = GeminiUsageLog::query()
+            ->where('created_at', '>=', $aiSince)
+            ->whereNotNull('phone')
+            ->select('phone', DB::raw('MAX(push_name) as push_name'), DB::raw('COUNT(*) as requests'), DB::raw('SUM(total_tokens) as total_tokens'))
+            ->groupBy('phone')
+            ->orderByDesc('requests')
+            ->limit(5)
+            ->get();
+
         return view('analytics.index', [
             'visitorStats' => $visitorStats,
             'dailyVisits' => $dailyVisits,
@@ -114,6 +156,10 @@ class AnalyticsController extends Controller
             'failedByIp' => $failedByIp,
             'userLogins' => $userLogins,
             'auditLogs' => $auditLogs,
+            'aiTotals' => $aiTotals,
+            'aiDaily' => $aiDaily,
+            'aiRecentLogs' => $aiRecentLogs,
+            'aiTopCustomers' => $aiTopCustomers,
         ]);
     }
 }

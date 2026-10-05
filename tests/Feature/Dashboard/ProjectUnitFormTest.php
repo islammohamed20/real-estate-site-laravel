@@ -52,7 +52,9 @@ class ProjectUnitFormTest extends TestCase
             ->get(route('dashboard.projects.units.edit', [$project, $unit]))
             ->assertOk()
             ->assertViewIs('dashboard.projects.units.form')
-            ->assertViewHas('buildings', fn ($buildings) => $buildings->contains('id', $building->id));
+            ->assertViewHas('buildings', fn ($buildings) => $buildings->contains('id', $building->id))
+            ->assertSee('formaction="'.route('dashboard.projects.units.update', [$project, $unit]).'"', false)
+            ->assertDontSee('formaction="'.route('dashboard.projects.units.edit', [$project, $unit]).'"', false);
     }
 
     public function test_calculator_only_loads_floors_that_contain_units(): void

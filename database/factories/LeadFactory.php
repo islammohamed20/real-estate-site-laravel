@@ -33,7 +33,7 @@ class LeadFactory extends Factory
             'unit_type' => fake()->optional()->randomElement(['Apartment', 'Villa', 'Duplex', 'Penthouse']),
             'bedrooms' => fake()->optional()->numberBetween(1, 5),
             'required_area' => fake()->optional()->randomFloat(2, 80, 300),
-            'preferred_payment_plan' => fake()->optional()->randomElement(['Cash', 'Installments 5 years', 'Installments 8 years']),
+            'preferred_payment_plan' => fake()->optional()->randomElement(['Cash', 'Installments 5 years']),
             'priority' => fake()->randomElement(['low', 'normal', 'high', 'urgent']),
             'notes' => fake()->sentence(),
             'follow_up_at' => fake()->optional()->dateTimeBetween('now', '+14 days'),

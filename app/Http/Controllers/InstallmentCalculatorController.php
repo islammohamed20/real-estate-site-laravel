@@ -20,23 +20,34 @@ use App\Models\Unit;
 use App\Notifications\CrmActivityNotification;
 use App\Repositories\Interfaces\InstallmentTemplateRepositoryInterface;
 use App\Services\Installments\InstallmentCalculatorService;
+use App\Services\PdfRendererService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Mpdf\Config\ConfigVariables;
-use Mpdf\Config\FontVariables;
-use Mpdf\Mpdf;
 
 class InstallmentCalculatorController extends Controller
 {
     public function index(InstallmentTemplateRepositoryInterface $templates, Request $request): View
     {
         $isDashboard = $request->routeIs('dashboard.*');
-        $units = Unit::query()->with(['project', 'floor', 'building'])->orderBy('unit_number')->limit(200)->get();
-        $buildings = Building::query()->with('project')->orderBy('name')->get();
+        $filterPublicUnits = static function ($query): void {
+            $query->where('hidden_from_website', false)
+                ->where('status', UnitStatus::Available->value)
+                ->whereHas('project', fn ($projectQuery) => $projectQuery->where('status', 'active'));
+        };
+        $unitsQuery = Unit::query()
+            ->with(['project', 'floor', 'building'])
+            ->when(! $isDashboard, $filterPublicUnits)
+            ->orderBy('unit_number');
+        $units = $unitsQuery->limit(200)->get();
+        $buildings = Building::query()
+            ->with('project')
+            ->when(! $isDashboard, fn ($q) => $q->where('hidden_from_website', false))
+            ->orderBy('name')
+            ->get();
         $floors = Floor::query()
             ->whereHas('units')
             ->with('building:id,name,project_id')
@@ -44,10 +55,14 @@ class InstallmentCalculatorController extends Controller
             ->orderBy('number')
             ->get();
 
-        $unitId = $request->integer('unit_id');
+        $unitId = (int) old('unit_id', $request->integer('unit_id'));
 
         if ($unitId > 0 && $units->doesntContain('id', $unitId)) {
-            $unit = Unit::with(['project', 'floor', 'building'])->find($unitId);
+            $unitQuery = Unit::query()
+                ->with(['project', 'floor', 'building'])
+                ->whereKey($unitId)
+                ->when(! $isDashboard, $filterPublicUnits);
+            $unit = $unitQuery->first();
 
             if ($unit !== null) {
                 $units->prepend($unit);
@@ -56,16 +71,58 @@ class InstallmentCalculatorController extends Controller
 
         $companyProfile = CompanyProfile::query()->first() ?? new CompanyProfile(['maintenance_percent' => 7]);
 
+        $preselectedUnit = $units->firstWhere('id', $unitId);
+        $requestedUnitUnavailable = ! $isDashboard && $unitId > 0 && $preselectedUnit === null;
+        $preselectedProjectId = old('project_id', $request->input('project_id', $preselectedUnit?->project_id));
+        $preselectedBuildingId = old('building_id', $request->input('building_id', $preselectedUnit?->building_id));
+        $projects = Project::query()->orderBy('name')->get();
+        $preselectedProject = $projects->firstWhere('id', (int) $preselectedProjectId);
+
+        $allTemplates = $templates->all();
+        $template = $allTemplates->first();
+        $defaultInstallmentYears = ($preselectedProject && $preselectedProject->max_installment_years > 0)
+            ? $preselectedProject->max_installment_years
+            : ($template ? $template->installment_count * $template->installment_frequency->monthsPerInstallment() / 12 : 5);
+
+        $calcNum = fn (string $field, mixed $default): float => is_numeric(old($field)) ? (float) old($field) : (float) ($default ?? 0);
+
+        $calcDefaults = [
+            'area' => $calcNum('area', $preselectedUnit?->area ?? 0),
+            'price_per_meter' => $calcNum('price_per_meter', $preselectedUnit?->price_per_meter ?? 0),
+            'garden_price' => $calcNum('garden_price', $preselectedUnit?->garden_price ?? 0),
+            'roof_price' => $calcNum('roof_price', $preselectedUnit?->roof_price ?? 0),
+            'roof_area' => $calcNum('roof_area', $preselectedUnit?->roof_area ?? 0),
+            'excellence_percent' => $calcNum('excellence_percent', $preselectedUnit?->excellence_percent ?? $template?->defaults()['excellence_percent'] ?? 0),
+            'down_payment_percent' => $calcNum('down_payment_percent', $template?->down_payment_percent ?? 25),
+            'down_payment' => $calcNum('down_payment', 0),
+            'maintenance_percent' => $calcNum('maintenance_percent', $template?->maintenance_percent ?? $companyProfile?->maintenance_percent ?? 7),
+            'installment_years' => $calcNum('installment_years', $defaultInstallmentYears),
+            'installment_type' => (fn (): string => in_array(old('installment_type', $template?->installment_frequency?->value ?? 'quarterly'), ['monthly', 'quarterly'], true)
+                ? (string) old('installment_type', $template?->installment_frequency?->value ?? 'quarterly')
+                : 'quarterly')(),
+        ];
+
+        $templateId = old('installment_template_id', $template?->id);
+
         return view('installments.index', [
             'layout' => $isDashboard ? 'layouts.dashboard' : 'layouts.public',
             'isDashboard' => $isDashboard,
             'calculatorRoutes' => $this->calculatorRoutes($isDashboard),
-            'templates' => $templates->all(),
-            'projects' => Project::query()->orderBy('name')->get(),
+            'templates' => $allTemplates,
+            'projects' => $projects,
             'buildings' => $buildings,
             'floors' => $floors,
             'units' => $units,
             'companyProfile' => $companyProfile,
+            'preselectedUnit' => $preselectedUnit,
+            'selectedUnitId' => $preselectedUnit?->id ?? '',
+            'requestedUnitUnavailable' => $requestedUnitUnavailable,
+            'preselectedProject' => $preselectedProject,
+            'preselectedProjectId' => $preselectedProjectId,
+            'preselectedBuildingId' => $preselectedBuildingId,
+            'defaultInstallmentYears' => $defaultInstallmentYears,
+            'calcDefaults' => $calcDefaults,
+            'templateId' => $templateId,
         ]);
     }
 
@@ -170,8 +227,12 @@ class InstallmentCalculatorController extends Controller
             'name' => $this->planName($unit, (int) $validated['customer_id']),
             'status' => 'active',
             'base_price' => $result['base_price'],
+            'excellence_percent' => $result['excellence_percent'],
+            'excellence_amount' => $result['excellence_amount'],
+            'base_price_with_excellence' => $result['base_price_with_excellence'],
             // Store the total discount so the saved plan reconciles with its final price.
             'discount_amount' => $result['discount_amount'],
+            'discount_percent' => $result['discount_percent'],
             'final_price' => $result['final_price'],
             'maintenance_deposit' => $result['maintenance_deposit'],
             'down_payment' => $result['down_payment'],
@@ -326,7 +387,7 @@ class InstallmentCalculatorController extends Controller
         ];
     }
 
-    public function pdf(InstallmentCalculatorRequest $request, InstallmentCalculatorService $calculator): Response
+    public function pdf(InstallmentCalculatorRequest $request, InstallmentCalculatorService $calculator, PdfRendererService $renderer): Response
     {
         $input = $request->validated();
 
@@ -346,85 +407,22 @@ class InstallmentCalculatorController extends Controller
         $customer = ! empty($input['customer_id']) ? Customer::query()->find($input['customer_id']) : null;
         $offer = ! empty($input['offer_id']) ? Offer::query()->find($input['offer_id']) : null;
 
+        $reference = 'CALC-'.now()->format('Ymd-His').'-'.strtoupper(substr(md5(serialize($input).now()->format('YmdHis')), 0, 6));
+
         $html = view('installments.pdf', [
             'input' => $input,
             'result' => $result,
             'company' => $company,
-            'logoDataUri' => $this->imageDataUri($company?->logo_dark_path ?? $company?->logo_path),
-            'stampDataUri' => $this->imageDataUri($company?->stamp_path),
+            'reference' => $reference,
+            'logoDataUri' => $renderer->imageDataUri($company?->logo_dark_path ?? $company?->logo_path),
+            'stampDataUri' => $renderer->imageDataUri($company?->stamp_path),
             'unit' => $unit,
             'customer' => $customer,
             'offer' => $offer,
         ])->render();
 
-        $defaultConfig = (new ConfigVariables)->getDefaults();
-        $fontDirs = $defaultConfig['fontDir'];
-
-        $defaultFontConfig = (new FontVariables)->getDefaults();
-        $fontData = $defaultFontConfig['fontdata'];
-
-        $isArabic = app()->getLocale() === 'ar';
-        $tempDir = storage_path('mpdf-temp');
-
-        if (! is_dir($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
-
-        $mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'orientation' => 'P',
-            'tempDir' => $tempDir,
-            'fontDir' => array_merge($fontDirs, [public_path('fonts')]),
-            'fontdata' => $fontData + [
-                'tajawal' => [
-                    'R' => 'Tajawal-Regular.ttf',
-                    'B' => 'Tajawal-Bold.ttf',
-                ],
-            ],
-            'default_font' => 'tajawal',
-            'default_font_size' => 12,
-            'margin_left' => 20,
-            'margin_right' => 20,
-            'margin_top' => 20,
-            'margin_bottom' => 20,
-            'autoScriptToLang' => true,
-            'autoLangToFont' => true,
-        ]);
-
-        $mpdf->SetDirectionality($isArabic ? 'rtl' : 'ltr');
-        $mpdf->SetFooter($isArabic ? '{PAGENO} / {nb}' : '{PAGENO} / {nb}');
-        $mpdf->WriteHTML($html);
-
         $filename = 'installment-plan-'.now()->format('Ymd-His').'.pdf';
 
-        $content = $mpdf->Output('', 'S');
-
-        return response($content, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ]);
-    }
-
-    /**
-     * Turn a stored asset URL (e.g. /storage/company-assets/logos/x.png) into a
-     * base64 data URI so mPDF can embed it without external HTTP access.
-     */
-    private function imageDataUri(?string $url): ?string
-    {
-        if (empty($url)) {
-            return null;
-        }
-
-        $path = parse_url($url, PHP_URL_PATH);
-        $file = $path ? public_path(ltrim($path, '/')) : null;
-
-        if ($file !== null && is_file($file) && is_readable($file)) {
-            $mime = function_exists('mime_content_type') ? mime_content_type($file) : 'image/png';
-
-            return 'data:'.($mime ?: 'image/png').';base64,'.base64_encode((string) file_get_contents($file));
-        }
-
-        return null;
+        return $renderer->renderResponse($html, $filename, inline: true);
     }
 }

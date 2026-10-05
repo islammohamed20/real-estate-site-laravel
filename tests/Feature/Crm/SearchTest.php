@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Crm;
 
 use App\Models\Customer;
+use App\Models\Lead;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,5 +36,26 @@ class SearchTest extends TestCase
             ->assertOk()
             ->assertViewIs('crm.search.index')
             ->assertSee('Searchable Customer');
+    }
+
+    public function test_limited_search_is_scoped_to_assigned_records(): void
+    {
+        $actor = User::factory()->create(['is_active' => true]);
+        $actor->givePermissionTo(['view crm dashboard', 'view own leads', 'view own customers']);
+        $ownLead = Lead::factory()->create([
+            'name' => 'Scoped Search Match',
+            'assigned_sales_id' => $actor->id,
+        ]);
+        Customer::factory()->create(['name' => 'Scoped Search Customer']);
+        Lead::factory()->create([
+            'name' => 'Scoped Search Match',
+            'assigned_sales_id' => $this->user->id,
+        ]);
+
+        $this->actingAs($actor)
+            ->get(route('dashboard.crm.search', ['q' => 'Scoped Search Match']))
+            ->assertOk()
+            ->assertSee($ownLead->name)
+            ->assertDontSee('Scoped Search Customer');
     }
 }

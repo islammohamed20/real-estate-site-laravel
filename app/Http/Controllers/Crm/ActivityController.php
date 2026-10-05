@@ -44,8 +44,8 @@ class ActivityController extends Controller
 
         if ($activityable instanceof CrmDeal) {
             $data['deal_id'] = $activityable->id;
-        } elseif ($activityable instanceof Lead && $activityable->offers()->exists()) {
-            $data['deal_id'] = optional($activityable->offers()->first())->deal_id;
+        } elseif ($activityable instanceof Lead) {
+            $data['deal_id'] = CrmDeal::query()->where('lead_id', $activityable->id)->value('id');
         } elseif ($activityable instanceof Customer) {
             $data['deal_id'] = optional($activityable->deals()->first())->id;
         }

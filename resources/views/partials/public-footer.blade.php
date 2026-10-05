@@ -1,4 +1,26 @@
 @php($companyProfile = \App\Models\CompanyProfile::query()->first())
+@php($publicWhatsappNumber = ($companyProfile?->sales_manager_whatsapp ?: $companyProfile?->phone) ? preg_replace('/\D+/', '', $companyProfile->sales_manager_whatsapp ?: $companyProfile->phone) : null)
+@php($publicMessengerUrl = $companyProfile?->messenger_url)
+@if (! $publicMessengerUrl && $companyProfile?->facebook_url)
+    @php($facebookPath = trim((string) parse_url($companyProfile->facebook_url, PHP_URL_PATH), '/'))
+    @php($publicMessengerUrl = $facebookPath !== '' ? 'https://m.me/'.$facebookPath : null)
+@endif
+
+@if ($publicMessengerUrl || $publicWhatsappNumber)
+    <div class="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-end gap-2 px-4 lg:bottom-6" aria-label="{{ __('Contact us') }}">
+        @if ($publicMessengerUrl)
+            <a href="{{ $publicMessengerUrl }}" target="_blank" rel="noopener noreferrer" class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl shadow-blue-900/30 transition hover:scale-105 hover:bg-blue-500" title="{{ __('Messenger') }}" aria-label="{{ __('Messenger') }}">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.12 2 11.2c0 2.89 1.47 5.48 3.76 7.2L5 21l3.35-1.74c1.13.31 2.35.48 3.65.48 5.523 0 10-4.12 10-9.2S17.523 2 12 2Zm-2.4 14.1-3.1-1.65 3.45-3.65 1.65 1.65 3.7-2.2-3.45 3.65-1.65-1.65-3.7 2.2 3.1 1.65Z"/></svg>
+            </a>
+        @endif
+        @if ($publicWhatsappNumber)
+            <a href="https://wa.me/{{ $publicWhatsappNumber }}" target="_blank" rel="noopener noreferrer" class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xl shadow-emerald-900/30 transition hover:scale-105 hover:bg-emerald-500" title="{{ __('WhatsApp') }}" aria-label="{{ __('WhatsApp') }}">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.198.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347Z"/><path d="M12.05 2a9.95 9.95 0 0 0-8.47 15.17L2 22l5.02-1.55A9.95 9.95 0 1 0 12.05 2Zm0 18.1a8.14 8.14 0 0 1-4.14-1.13l-.3-.18-2.98.92.8-2.9-.2-.31a8.14 8.14 0 1 1 6.82 3.6Z"/></svg>
+            </a>
+        @endif
+    </div>
+@endif
+
 <footer class="relative mt-20 overflow-hidden border-t border-white/10 bg-slate-950/90">
     {{-- Decorative gradient line + ambient glows --}}
     <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-500/70 to-transparent"></div>
@@ -20,7 +42,7 @@
                         </span>
                     @endif
                     <span class="leading-tight">
-                        <strong class="block text-lg font-bold text-white">{{ $companyProfile?->name ?? 'Venecia Developments' }}</strong>
+                        <strong class="block text-lg font-bold text-white">{{ $companyProfile?->name ?? config('app.name') }}</strong>
                         <span class="block text-xs text-brand-300">{{ __('Real estate management system') }}</span>
                     </span>
                 </a>
@@ -66,6 +88,12 @@
                         <a href="{{ route('public.projects.index') }}" class="group inline-flex items-center gap-1.5 transition hover:text-white">
                             <svg class="h-3.5 w-3.5 text-brand-400 transition-transform group-hover:-translate-x-0.5 rtl:rotate-180 rtl:group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             {{ __('المشاريع والوحدات المتاحة') }}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('public.portfolio') }}" class="group inline-flex items-center gap-1.5 transition hover:text-white">
+                            <svg class="h-3.5 w-3.5 text-brand-400 transition-transform group-hover:-translate-x-0.5 rtl:rotate-180 rtl:group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            {{ __('سابقة الأعمال') }}
                         </a>
                     </li>
                     <li>
@@ -130,7 +158,7 @@
                     <div class="pointer-events-none absolute -end-8 -top-8 h-24 w-24 rounded-full bg-brand-500/20 blur-2xl"></div>
                     <svg class="h-8 w-8 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="3" width="14" height="18" rx="2" stroke-width="1.8"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01M16 18.5h.01" stroke-width="1.8" stroke-linecap="round"/></svg>
                     <h3 class="mt-3 text-base font-bold text-white">{{ __('احسب خطة سدادك') }}</h3>
-                    <p class="mt-1 text-xs leading-relaxed text-slate-400">{{ __('خطة تقسيط مباشرة تبدأ بمقدم 10% وسداد يصل إلى 8 سنوات.') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-slate-400">{{ __('Installment plans start with a :percent% down payment and offer payment terms up to 5 years.', ['percent' => number_format($defaultDownPaymentPercent, 0)]) }}</p>
                     <a href="{{ route('installments.index') }}" class="app-button mt-4 w-full justify-center text-xs py-2.5">
                         {{ __('افتح الحاسبة') }} ←
                     </a>
@@ -140,7 +168,7 @@
 
         <div class="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 sm:flex-row">
             <p class="text-xs text-slate-500">
-                © {{ date('Y') }} <strong class="text-slate-300">{{ $companyProfile?->name ?? 'Venecia Developments' }}</strong> — {{ __('All rights reserved.') }}
+                © {{ date('Y') }} <strong class="text-slate-300">EMS Tech</strong> — {{ __('All rights reserved.') }}
             </p>
             <p class="flex items-center gap-1.5 text-xs text-slate-500">
                 <svg class="h-3.5 w-3.5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>

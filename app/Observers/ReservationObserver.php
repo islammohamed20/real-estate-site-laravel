@@ -16,9 +16,22 @@ class ReservationObserver
 
     public function saved(Reservation $reservation): void
     {
-        if ($reservation->isDirty('status') || $reservation->wasRecentlyCreated) {
+        if ($reservation->isDirty('status') || $reservation->isDirty('unit_id') || $reservation->wasRecentlyCreated) {
+            $previousUnitId = $reservation->getOriginal('unit_id');
             $this->syncUnitAvailability($reservation);
+
+            if ($reservation->isDirty('unit_id') && $previousUnitId) {
+                $this->releaseUnitIfUnused((int) $previousUnitId);
+            }
+
             $this->conversionService->convertIfReservationConverted($reservation);
+        }
+    }
+
+    public function deleted(Reservation $reservation): void
+    {
+        if ($reservation->unit_id) {
+            $this->releaseUnitIfUnused((int) $reservation->unit_id);
         }
     }
 
@@ -50,6 +63,23 @@ class ReservationObserver
             if ($unit->status === UnitStatus::Reserved) {
                 $unit->update(['status' => UnitStatus::Available->value]);
             }
+        }
+    }
+
+    private function releaseUnitIfUnused(int $unitId): void
+    {
+        $hasActive = Reservation::query()
+            ->where('unit_id', $unitId)
+            ->whereIn('status', ['pending', 'paid'])
+            ->exists();
+
+        if ($hasActive) {
+            return;
+        }
+
+        $unit = \App\Models\Unit::query()->find($unitId);
+        if ($unit && $unit->status === UnitStatus::Reserved) {
+            $unit->update(['status' => UnitStatus::Available->value]);
         }
     }
 }

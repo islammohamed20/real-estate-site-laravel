@@ -42,7 +42,9 @@ class DealsTest extends TestCase
         $this->actingAs($this->user)
             ->get(route('dashboard.crm.deals.index', ['pipeline' => $this->pipeline->id]))
             ->assertOk()
-            ->assertViewIs('crm.deals.index');
+            ->assertViewIs('crm.deals.index')
+            ->assertSee(__('+ New Deal'))
+            ->assertSee('openDealModal()', false);
     }
 
     public function test_deal_can_be_created(): void
@@ -135,6 +137,26 @@ class DealsTest extends TestCase
             ->get(route('dashboard.crm.deals.show', $deal))
             ->assertOk()
             ->assertViewIs('crm.deals.show');
+    }
+
+    public function test_user_cannot_update_another_users_deal(): void
+    {
+        $stage = $this->pipeline->stages->first();
+        $owner = User::factory()->create(['is_active' => true]);
+        $actor = User::factory()->create(['is_active' => true]);
+        $actor->givePermissionTo(['view own deals', 'edit own deals']);
+        $deal = CrmDeal::factory()->create([
+            'pipeline_id' => $this->pipeline->id,
+            'stage_id' => $stage->id,
+            'created_by' => $owner->id,
+            'assigned_to' => $owner->id,
+        ]);
+
+        $this->actingAs($actor)
+            ->put(route('dashboard.crm.deals.update', $deal), ['title' => 'Unauthorized change'])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('crm_deals', ['id' => $deal->id, 'title' => 'Unauthorized change']);
     }
 
     public function test_winning_deal_converts_linked_lead_to_customer(): void

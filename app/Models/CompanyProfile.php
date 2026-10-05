@@ -33,6 +33,7 @@ class CompanyProfile extends Model
         'email',
         'website',
         'facebook_url',
+        'messenger_url',
         'instagram_url',
         'seo_title',
         'seo_description',

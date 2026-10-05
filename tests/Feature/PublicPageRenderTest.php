@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Building;
 use App\Models\CompanyProfile;
 use App\Models\Customer;
+use App\Models\Floor;
+use App\Models\InstallmentTemplate;
+use App\Models\Project;
+use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +29,7 @@ class PublicPageRenderTest extends TestCase
             'email' => 'info@venecia-dev.com',
             'website' => 'https://venecia-dev.com',
             'facebook_url' => 'https://facebook.com/venecia',
+            'messenger_url' => 'https://m.me/venecia',
             'instagram_url' => 'https://instagram.com/venecia',
         ]);
 
@@ -32,6 +38,7 @@ class PublicPageRenderTest extends TestCase
         $response->assertOk();
         $response->assertSee('facebook.com/venecia', false);
         $response->assertSee('instagram.com/venecia', false);
+        $response->assertSee('m.me/venecia', false);
         $response->assertSee('wa.me', false);
     }
 
@@ -46,6 +53,7 @@ class PublicPageRenderTest extends TestCase
             ->get(route('dashboard.settings.index'))
             ->assertOk()
             ->assertSee('name="facebook_url"', false)
+            ->assertSee('name="messenger_url"', false)
             ->assertSee('name="instagram_url"', false)
             ->assertSee('name="seo_title"', false)
             ->assertSee('name="seo_description"', false)
@@ -137,5 +145,90 @@ class PublicPageRenderTest extends TestCase
             ->get(route('customer.verify.show'))
             ->assertOk()
             ->assertSee('ahmed@example.com');
+    }
+
+    public function test_unit_details_use_the_unit_id_when_unit_numbers_repeat(): void
+    {
+        InstallmentTemplate::factory()->create([
+            'is_default' => true,
+            'is_active' => true,
+            'down_payment_percent' => 10,
+        ]);
+
+        $project = Project::factory()->create(['max_installment_years' => 5]);
+        $building = Building::factory()->create(['project_id' => $project->id]);
+        $floor = Floor::factory()->create(['project_id' => $project->id, 'building_id' => $building->id]);
+        $firstUnit = Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'floor_id' => $floor->id,
+            'unit_number' => 'شقة 1',
+            'area' => 165,
+        ]);
+        $secondUnit = Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'floor_id' => $floor->id,
+            'unit_number' => 'شقة 1',
+            'area' => 125,
+            'current_price' => 1000000,
+        ]);
+
+        $this->get(route('public.units.show', $secondUnit->id))
+            ->assertOk()
+            ->assertSee('45,000')
+            ->assertSee('125')
+            ->assertDontSee('165 m²');
+
+        $this->assertNotSame($firstUnit->id, $secondUnit->id);
+    }
+
+    public function test_public_project_building_picker_shows_buildings_with_visible_sold_units(): void
+    {
+        $project = Project::factory()->create(['status' => 'active']);
+        $availableBuilding = Building::factory()->create(['project_id' => $project->id, 'name' => 'Available Building']);
+        $soldBuilding = Building::factory()->create(['project_id' => $project->id, 'name' => 'Sold Building']);
+        $availableFloor = Floor::factory()->create(['project_id' => $project->id, 'building_id' => $availableBuilding->id]);
+        $soldFloor = Floor::factory()->create(['project_id' => $project->id, 'building_id' => $soldBuilding->id]);
+
+        Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $availableBuilding->id,
+            'floor_id' => $availableFloor->id,
+            'status' => 'available',
+        ]);
+        Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $soldBuilding->id,
+            'floor_id' => $soldFloor->id,
+            'status' => 'sold',
+        ]);
+
+        $this->get(route('public.projects.index', ['project' => $project->id]))
+            ->assertOk()
+            ->assertSee('Available Building')
+            ->assertSee('Sold Building');
+    }
+
+    public function test_unit_details_show_project_based_plans_and_building_name(): void
+    {
+        $project = Project::factory()->create(['max_installment_years' => 7]);
+        $building = Building::factory()->create(['project_id' => $project->id, 'name' => 'برج النخيل']);
+        $floor = Floor::factory()->create(['project_id' => $project->id, 'building_id' => $building->id]);
+        $unit = Unit::factory()->create([
+            'project_id' => $project->id,
+            'building_id' => $building->id,
+            'floor_id' => $floor->id,
+            'current_price' => 1000000,
+        ]);
+
+        // 10% down = 100,000 ; remaining = 900,000
+        // 7-year quarterly: 900,000 / 28 = 32,142.857...
+        // 7-year monthly: 900,000 / 84 = 10,714.285...
+        $this->get(route('public.units.show', $unit->id))
+            ->assertOk()
+            ->assertSee('برج النخيل')
+            ->assertDontSee('خطة 4 سنوات أقساط ربع سنوية')
+            ->assertDontSee('خطة 48 شهر أقساط شهرية');
     }
 }

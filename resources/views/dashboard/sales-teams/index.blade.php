@@ -69,6 +69,7 @@
                             @endif
                             <span class="ms-1 line-clamp-1 text-[11px] text-slate-500">
                                 {{ $team->members->take(5)->pluck('name')->implode('، ') }}
+                                <span class="ms-1 text-slate-400">• العملاء: {{ $team->assigned_customers_count ?? 0 }} • العملاء المحتملون: {{ $team->active_leads_count ?? 0 }}</span>
                             </span>
                         </div>
                     @else

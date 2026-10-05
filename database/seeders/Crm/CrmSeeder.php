@@ -96,6 +96,7 @@ class CrmSeeder extends Seeder
     private function seedLeadSources(): void
     {
         $sources = [
+            ['name' => 'Portal', 'color' => '#64748b', 'sort_order' => 0],
             ['name' => 'Website', 'color' => '#3b82f6', 'sort_order' => 1, 'is_default' => true],
             ['name' => 'Facebook', 'color' => '#1877f2', 'sort_order' => 2],
             ['name' => 'Instagram', 'color' => '#e1306c', 'sort_order' => 3],

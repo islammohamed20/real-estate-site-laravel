@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\BlockMobileLayout;
 use App\Http\Middleware\BlockSalesManagerFromWhatsApp;
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureCustomerAuthenticated;
 use App\Http\Middleware\EnsureNotForceLoggedOut;
+use App\Http\Middleware\EnsureSingleSession;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -29,23 +31,28 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
             SecurityHeaders::class,
+            EnsureSingleSession::class,
         ]);
 
         // The Evolution API WhatsApp instance posts incoming-message events here (no CSRF token).
         $middleware->validateCsrfTokens(except: [
             'webhook/whatsapp/evolution',
+            'webhook/gemini/usage',
         ]);
 
         $middleware->alias([
             'active' => EnsureActiveUser::class,
+            'block_mobile_layout' => BlockMobileLayout::class,
             'block_sales_manager_whatsapp' => BlockSalesManagerFromWhatsApp::class,
             'customer.auth' => EnsureCustomerAuthenticated::class,
             '2fa' => RequireTwoFactor::class,
             'force_logout' => EnsureNotForceLoggedOut::class,
+            'single_session' => EnsureSingleSession::class,
             'track_visitor' => TrackVisitor::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'passkey_confirmed' => \App\Http\Middleware\PasskeyConfirmed::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

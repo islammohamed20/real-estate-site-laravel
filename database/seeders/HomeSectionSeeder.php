@@ -16,7 +16,7 @@ class HomeSectionSeeder extends Seeder
                 'key' => 'hero',
                 'title' => __('ابتكار العمران.. وصناعة مجتمعات'),
                 'subtitle' => __('سكنية فاخرة'),
-                'content' => __('نبتكر حلولاً معمارية متكاملة تدمج بين الرفاهية والسكن الراقي في أرقى المواقع الحيوية، مع أنظمة سداد مرنة وتقسيط مباشر يصل إلى 8 سنوات بدون فوائد.'),
+                'content' => __('نبتكر حلولاً معمارية متكاملة تدمج بين الرفاهية والسكن الراقي في أرقى المواقع الحيوية، مع أنظمة سداد مرنة وتقسيط مباشر يصل إلى 5 سنوات بدون فوائد.'),
                 'sort_order' => 1,
             ],
             [
@@ -28,14 +28,14 @@ class HomeSectionSeeder extends Seeder
             ],
             [
                 'key' => 'projects',
-                'title' => __('مجتمعات سكنية متكاملة بلمسة إيطالية'),
-                'subtitle' => __('Featured projects'),
+                'title' => __('Integrated Communities for Modern Living'),
+                'subtitle' => __('Our Developments'),
                 'content' => null,
                 'sort_order' => 3,
             ],
             [
                 'key' => 'units',
-                'title' => __('أحدث الوحدات المتاحة للتعاقد الفوري'),
+                'title' => __('Selected Units for Your Next Move'),
                 'subtitle' => __('فرص استثمارية مميزة'),
                 'content' => null,
                 'sort_order' => 4,

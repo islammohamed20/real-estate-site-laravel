@@ -27,12 +27,30 @@ class FollowUpTest extends TestCase
         $this->user->assignRole('Administrator');
     }
 
-    public function test_follow_ups_index_can_be_rendered(): void
+    public function test_follow_ups_index_can_be_rendered_with_creation_form(): void
     {
         $this->actingAs($this->user)
             ->get(route('dashboard.crm.follow_ups.index'))
             ->assertOk()
-            ->assertViewIs('crm.follow_ups.index');
+            ->assertViewIs('crm.follow_ups.index')
+            ->assertSee(__('Schedule a follow-up'))
+            ->assertSee('follow_up_at', false)
+            ->assertSee(route('dashboard.crm.follow_ups.store'), false);
+    }
+
+    public function test_sales_executive_can_only_assign_follow_up_to_self(): void
+    {
+        $salesExecutive = User::factory()->create(['is_active' => true]);
+        $salesExecutive->assignRole('Sales Executive');
+        $otherUser = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($salesExecutive)
+            ->get(route('dashboard.crm.follow_ups.index'))
+            ->assertOk()
+            ->assertViewHas('users', function ($users) use ($salesExecutive, $otherUser): bool {
+                return $users->keys()->all() === [$salesExecutive->id]
+                    && ! $users->has($otherUser->id);
+            });
     }
 
     public function test_follow_up_can_be_scheduled_for_lead(): void
@@ -44,7 +62,6 @@ class FollowUpTest extends TestCase
                 'lead_id' => $lead->id,
                 'follow_up_at' => now()->addDay()->format('Y-m-d H:i:s'),
                 'type' => 'phone_call',
-                'channel' => 'phone',
                 'notes' => 'Call to confirm interest',
                 'priority' => 'high',
             ])
@@ -53,7 +70,6 @@ class FollowUpTest extends TestCase
         $this->assertDatabaseHas('follow_ups', [
             'lead_id' => $lead->id,
             'type' => 'phone_call',
-            'channel' => 'phone',
             'priority' => 'high',
         ]);
     }

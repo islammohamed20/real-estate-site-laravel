@@ -19,7 +19,7 @@ class InstallmentTemplateFactory extends Factory
             'name' => fake()->words(3, true),
             'code' => strtoupper(fake()->unique()->bothify('TPL-###')),
             'description' => fake()->sentence(),
-            'down_payment_percent' => 10,
+            'down_payment_percent' => 25,
             'down_payment_amount' => null,
             'installment_count' => 16,
             'installment_frequency' => InstallmentFrequency::Quarterly,

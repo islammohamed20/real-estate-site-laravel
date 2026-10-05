@@ -35,33 +35,32 @@
         .brand-title { font-size: 13px; font-weight: 700; color: #fbbf24; }
 
         .meta-pair {
-            display: table;
             width: 100%;
             margin-bottom: 14px;
-            border-collapse: separate;
             border-spacing: 8px 0;
         }
-        .meta-box {
-            display: table-cell;
+        .meta-pair td {
             width: 50%;
             vertical-align: top;
+            padding: 0 4px;
+        }
+        .meta-box {
             border: 1px solid #e2e8f0;
             border-radius: 10px;
             overflow: hidden;
         }
-        .meta-grid { display: table; width: 100%; }
-        .meta-grid-row { display: table-row; }
-        .meta-cell {
-            display: table-cell;
+        .meta-grid { width: 100%; border-collapse: collapse; }
+        .meta-grid td {
             padding: 8px 12px;
             width: 50%;
             vertical-align: top;
         }
-        .meta-cell + .meta-cell { border-{{ app()->getLocale() === 'ar' ? 'left' : 'right' }}: 1px solid #e2e8f0; }
-        .meta-label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+        .meta-grid td + td { border-{{ app()->getLocale() === 'ar' ? 'right' : 'left' }}: 1px solid #e2e8f0; }
+        .meta-label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: {{ app()->getLocale() === 'ar' ? '0' : '0.06em' }}; }
         .meta-value { font-size: 11.5px; font-weight: 600; color: #0f172a; margin-top: 2px; }
 
-        .section { margin-top: 16px; page-break-inside: avoid; }
+        .section { margin-top: 16px; }
+        .section--keep-together { page-break-inside: avoid; }
         .section-title {
             font-size: 12.5px;
             font-weight: 700;
@@ -69,7 +68,12 @@
             background: #0f172a;
             border-radius: 8px;
             padding: 7px 12px;
-            margin: 0 0 10px;
+            margin: 0;
+            page-break-after: avoid;
+        }
+        .section + .detail,
+        .section table.detail {
+            margin-top: 0;
         }
         .section-title .accent { color: #fbbf24; }
 
@@ -77,14 +81,13 @@
             width: 100%;
             border-collapse: collapse;
             direction: {{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }};
-            table-layout: fixed;
+            page-break-inside: avoid;
         }
 
         table.schedule {
             width: 100%;
             border-collapse: collapse;
             direction: ltr;
-            table-layout: fixed;
         }
 
         table.detail th,
@@ -99,23 +102,29 @@
             background: #f8fafc;
             color: #334155;
             font-weight: 700;
-            width: 38%;
-            text-align: {{ app()->getLocale() === 'ar' ? 'left' : 'right' }};
+            width: 40%;
+            text-align: {{ app()->getLocale() === 'ar' ? 'right' : 'left' }};
         }
 
         table.detail td {
             font-weight: 600;
-            text-align: {{ app()->getLocale() === 'ar' ? 'right' : 'left' }};
+            text-align: {{ app()->getLocale() === 'ar' ? 'left' : 'right' }};
+            width: 60%;
         }
 
-        table.detail tr.total th,
+        table.detail tr.total th {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            font-size: 13px;
+            color: #166534;
+        }
+
         table.detail tr.total td {
             background: #f0fdf4;
             border-color: #bbf7d0;
             font-size: 13px;
+            color: #059669;
         }
-
-        table.detail tr.total td { color: #059669; }
 
         table.schedule th {
             background: #0f172a;
@@ -131,6 +140,16 @@
         table.schedule td.center { text-align: center; }
         table.schedule thead { display: table-header-group; }
         table.schedule tr { page-break-inside: avoid; }
+        .schedule-range {
+            font-size: 10px;
+            color: #334155;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
 
         table.schedule tr.total-row td {
             background: #f0fdf4;
@@ -149,12 +168,13 @@
         }
 
         .highlight-green { background: #f0fdf4; }
+        .highlight-green th { color: #059669; font-weight: 700; background: #f0fdf4; }
         .highlight-green td { color: #059669; font-weight: 700; font-size: 13px; }
         .highlight-amber { background: #fffbeb; }
+        .highlight-amber th { color: #92400e; font-weight: 700; background: #fffbeb; }
         .highlight-amber td { color: #d97706; font-weight: 700; }
 
         .pct-badge {
-            display: inline-block;
             padding: 2px 8px;
             border-radius: 999px;
             background: #d1fae5;
@@ -162,7 +182,8 @@
             font-size: 9.5px;
             font-weight: 700;
             vertical-align: middle;
-            margin-{{ app()->getLocale() === 'ar' ? 'left' : 'right' }}: 5px;
+            margin-left: 5px;
+            margin-right: 5px;
         }
 
         .notes-box {
@@ -176,14 +197,14 @@
         }
 
         .signatures {
-            margin-top: 34px;
+            margin-top: 18px;
             page-break-inside: avoid;
         }
         .signatures table { width: 100%; border-collapse: collapse; }
-        .signatures td { width: 50%; vertical-align: top; }
+        .signatures td { width: 50%; vertical-align: bottom; }
         .sign-line {
             border-top: 1.5px solid #334155;
-            margin-top: 52px;
+            margin-top: 28px;
             padding-top: 6px;
             font-size: 11px;
             font-weight: 700;
@@ -191,15 +212,28 @@
             width: 78%;
         }
         .sign-role { font-size: 10px; color: #64748b; margin-top: 2px; }
-        .stamp-img { max-height: 70px; max-width: 160px; margin-bottom: 6px; }
+        .stamp-img { max-height: 48px; max-width: 130px; margin-bottom: 4px; }
 
         .footer-note { margin-top: 16px; color: #334155; font-size: 9.5px; text-align: center; }
         .center { text-align: center; }
         .ltr { direction: ltr; }
         .nowrap { white-space: nowrap; }
+
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-35deg);
+            font-size: 64px;
+            font-weight: 700;
+            color: rgba(148, 163, 184, 0.12);
+            white-space: nowrap;
+            z-index: -1;
+        }
     </style>
 </head>
 <body>
+    <div class="watermark">{{ __('Non-binding offer') }}</div>
     <div class="container">
         {{-- Brand header --}}
         <div class="brand-bar">
@@ -218,7 +252,8 @@
                     <td style="width: 40%; text-align: center;">
                         <div class="brand-title">{{ __('Proposed Payment Schedule') }}</div>
                         <div style="font-size: 10px; color: #e2e8f0; margin-top: 3px;">{{ __('Installment Plan') }}</div>
-                        <div class="ltr" style="font-size: 9.5px; color: #cbd5e1; margin-top: 4px;">{{ now()->format('Y-m-d H:i') }}</div>
+                        <div class="ltr" style="font-size: 9.5px; color: #cbd5e1; margin-top: 4px;">{{ __('Ref') }}: {{ $reference }}</div>
+                        <div class="ltr" style="font-size: 9.5px; color: #cbd5e1; margin-top: 2px;">{{ now()->format('Y-m-d H:i') }} ({{ config('app.timezone') }})</div>
                     </td>
                     <td style="width: 30%; text-align: {{ app()->getLocale() === 'ar' ? 'left' : 'right' }};">
                         <div class="brand-contacts ltr">
@@ -243,69 +278,87 @@
         </div>
 
         {{-- Client & unit metadata (two boxes side by side) --}}
-        <div class="meta-pair">
-            <div class="meta-box">
-                <div class="meta-grid">
-                    <div class="meta-grid-row">
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Customer') }}</div>
-                            <div class="meta-value">{{ $customer?->name ?? __('—') }}</div>
-                        </div>
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Phone') }}</div>
-                            <div class="meta-value ltr">{{ $customer?->phone ?? '—' }}</div>
-                        </div>
+        <table class="meta-pair" cellpadding="0" cellspacing="8">
+            <tr>
+                {{-- Customer details --}}
+                <td>
+                    <div class="meta-box">
+                        <table class="meta-grid" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Customer') }}</div>
+                                    <div class="meta-value">{{ $customer?->name ?? __('—') }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Phone') }}</div>
+                                    <div class="meta-value ltr">{{ $customer?->phone ?? '—' }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Email') }}</div>
+                                    <div class="meta-value ltr">{{ $customer?->email ?? '—' }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Offer') }}</div>
+                                    <div class="meta-value">{{ $offer?->offer_number ?? '—' }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Project') }}</div>
+                                    <div class="meta-value">{{ $unit?->project?->name ?? '—' }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Delivery Date') }}</div>
+                                    <div class="meta-value ltr">{{ $unit?->delivery_date ? $unit->delivery_date->format('Y-m-d') : '—' }}</div>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
-                    <div class="meta-grid-row">
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Project') }}</div>
-                            <div class="meta-value">{{ $unit?->project?->name ?? '—' }}</div>
-                        </div>
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Unit') }}</div>
-                            <div class="meta-value">{{ $unit?->unit_number ?? '—' }}</div>
-                        </div>
+                </td>
+                {{-- Unit details --}}
+                <td>
+                    <div class="meta-box">
+                        <table class="meta-grid" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Unit') }}</div>
+                                    <div class="meta-value">{{ $unit?->unit_number ?? '—' }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Unit Type') }}</div>
+                                    <div class="meta-value">{{ $unit?->unit_type ? __($unit->unit_type) : '—' }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Building') }}</div>
+                                    <div class="meta-value">{{ $unit?->building?->name ?? '—' }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Floor') }}</div>
+                                    <div class="meta-value">{{ $unit?->floor_label ?? '—' }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="meta-label">{{ __('Area') }}</div>
+                                    <div class="meta-value ltr">{{ $unit?->area ? number_format((float) $unit->area, 0) . ' ' . __('م²') : '—' }}</div>
+                                </td>
+                                <td>
+                                    <div class="meta-label">{{ __('Bedrooms') }}</div>
+                                    <div class="meta-value">{{ $unit?->bedrooms ?: '—' }}</div>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
-                </div>
-            </div>
-            <div class="meta-box">
-                <div class="meta-grid">
-                    <div class="meta-grid-row">
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Unit Type') }}</div>
-                            <div class="meta-value">{{ $unit?->unit_type ? __($unit->unit_type) : '—' }}</div>
-                        </div>
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Building') }}</div>
-                            <div class="meta-value">{{ $unit?->building?->name ?? '—' }}</div>
-                        </div>
-                    </div>
-                    <div class="meta-grid-row">
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Floor') }}</div>
-                            <div class="meta-value">{{ $unit?->floor ? (($unit->floor->number === 0 || $unit->floor->number === null) ? __('Ground Floor') : __('Floor :number', ['number' => $unit->floor->number])) : '—' }}</div>
-                        </div>
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Offer') }}</div>
-                            <div class="meta-value">{{ $offer?->offer_number ?? '—' }}</div>
-                        </div>
-                    </div>
-                    <div class="meta-grid-row">
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Area') }}</div>
-                            <div class="meta-value ltr">{{ $unit?->area ? number_format((float) $unit->area, 0) . ' ' . __('م²') : '—' }}</div>
-                        </div>
-                        <div class="meta-cell">
-                            <div class="meta-label">{{ __('Bedrooms') }}</div>
-                            <div class="meta-value">{{ $unit?->bedrooms ?: '—' }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
+        </table>
 
         {{-- Financial summary --}}
-        <div class="section">
+        <div class="section section--keep-together">
             <div class="section-title">{{ __('Financial Summary') }}</div>
             <table class="detail">
                 <tbody>
@@ -329,6 +382,16 @@
                         <th>{{ __('Final Price') }}</th>
                         <td class="ltr">{{ number_format((float) $result['final_price'], 2) }} {{ __('ج.م') }}</td>
                     </tr>
+                    @if ((float) $result['maintenance_deposit'] > 0)
+                        <tr class="highlight-amber">
+                            <th>{{ __('Maintenance Deposit') }} ({{ number_format((float) $result['maintenance_percent'], 2) }}%)</th>
+                            <td class="ltr">+ {{ number_format((float) $result['maintenance_deposit'], 2) }} {{ __('ج.م') }}</td>
+                        </tr>
+                        <tr class="total">
+                            <th>{{ __('Total incl. Maintenance') }}</th>
+                            <td class="ltr">{{ number_format((float) $result['final_price'] + (float) $result['maintenance_deposit'], 2) }} {{ __('ج.م') }}</td>
+                        </tr>
+                    @endif
                     <tr class="highlight-green">
                         <th>{{ $result['is_cash'] ? __('Cash Payment') : __('Down Payment') }}@if (! $result['is_cash'] && ! empty($input['down_payment_percent']))<span class="pct-badge">{{ number_format((float) $input['down_payment_percent'], 1) }}%</span>@endif</th>
                         <td class="ltr">{{ number_format((float) $result['down_payment'], 2) }} {{ __('ج.م') }}</td>
@@ -343,12 +406,6 @@
                             <td class="ltr">{{ number_format((float) $result['installment_amount'], 2) }} {{ __('ج.م') }}</td>
                         </tr>
                     @endif
-                    @if ((float) $result['maintenance_deposit'] > 0)
-                        <tr class="highlight-amber">
-                            <th>{{ __('Maintenance Deposit') }} ({{ number_format((float) $result['maintenance_percent'], 2) }}%)</th>
-                            <td class="ltr">+ {{ number_format((float) $result['maintenance_deposit'], 2) }} {{ __('ج.م') }}</td>
-                        </tr>
-                    @endif
                 </tbody>
             </table>
         </div>
@@ -361,35 +418,54 @@
                     {{ __('Cash payment — the full amount is paid upfront.') }}
                 </div>
             @else
+                @php($firstDue = $result['schedule'][0]['due_date'] ?? null)
+                @php($lastDue = $result['schedule'][count($result['schedule']) - 1]['due_date'] ?? null)
+                @if ($firstDue && $lastDue)
+                    <div class="schedule-range ltr">
+                        {{ __('First installment') }}: {{ $firstDue }} &nbsp;·&nbsp; {{ __('Last installment') }}: {{ $lastDue }}
+                    </div>
+                @endif
                 <table class="schedule">
+                    <colgroup>
+                        <col style="width: 8%;">
+                        <col style="width: 20%;">
+                        <col style="width: 24%;">
+                        <col style="width: 24%;">
+                        <col style="width: 24%;">
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="width: 12%;">#</th>
-                            <th style="width: 26%;">{{ __('Due Date') }}</th>
-                            <th style="width: 31%;">{{ __('Amount') }}</th>
-                            <th style="width: 31%;">{{ __('Balance After') }}</th>
+                            <th>#</th>
+                            <th>{{ __('Due Date') }}</th>
+                            <th>{{ __('Amount') }}</th>
+                            <th>{{ __('Paid to Date') }}</th>
+                            <th>{{ __('Balance After') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @php($totalAmount = 0)
+                        @php($cumulativePaid = 0)
+                        @php($runningBalance = (float) $result['remaining'])
                         @foreach ($result['schedule'] as $row)
                             @php($totalAmount += (float) $row['amount'])
+                            @php($cumulativePaid += (float) $row['amount'])
                             <tr>
                                 <td class="center">{{ $row['installment_number'] }}</td>
                                 <td class="center ltr">{{ $row['due_date'] }}</td>
                                 <td class="ltr">{{ number_format((float) $row['amount'], 2) }} {{ __('ج.م') }}</td>
+                                <td class="ltr">{{ number_format($cumulativePaid, 2) }} {{ __('ج.م') }}</td>
                                 <td class="ltr">{{ number_format((float) $row['balance_after'], 2) }} {{ __('ج.م') }}</td>
                             </tr>
                         @endforeach
                         <tr class="total-row">
                             <td class="center" colspan="2">{{ __('Total') }}</td>
                             <td class="ltr">{{ number_format($totalAmount, 2) }} {{ __('ج.م') }}</td>
+                            <td class="ltr">{{ number_format($totalAmount, 2) }} {{ __('ج.م') }}</td>
                             <td></td>
                         </tr>
                         <tr class="grand-total-row">
-                            <td class="center" colspan="2">{{ __('Grand Total (incl. Down Payment)') }}</td>
-                            <td class="ltr">{{ number_format((float) $result['final_price'], 2) }} {{ __('ج.م') }}</td>
-                            <td></td>
+                            <td class="center" colspan="3">{{ __('Grand Total (incl. Down Payment)') }}</td>
+                            <td class="ltr" colspan="2">{{ number_format((float) $result['final_price'], 2) }} {{ __('ج.م') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -408,6 +484,7 @@
                     <td style="text-align: {{ app()->getLocale() === 'ar' ? 'right' : 'left' }};">
                         <div class="sign-line" style="margin-{{ app()->getLocale() === 'ar' ? 'right' : 'left' }}: auto;">{{ __('Client Signature') }}</div>
                         <div class="sign-role">{{ $customer?->name ?? '' }}</div>
+                        <div class="sign-role">{{ __('Date') }}: <span class="ltr">____ / ____ / ________</span></div>
                     </td>
                     <td style="text-align: {{ app()->getLocale() === 'ar' ? 'left' : 'right' }};">
                         @if ($stampDataUri)
@@ -415,13 +492,16 @@
                         @endif
                         <div class="sign-line" style="margin-{{ app()->getLocale() === 'ar' ? 'left' : 'right' }}: auto;">{{ __('Company Signature') }}</div>
                         <div class="sign-role">{{ $company?->name ?? config('app.name') }}</div>
+                        <div class="sign-role">{{ __('Date') }}: <span class="ltr">____ / ____ / ________</span></div>
                     </td>
                 </tr>
             </table>
         </div>
 
         <div class="footer-note">
-            {{ __('This document was generated automatically from the calculator inputs and is subject to terms & conditions.') }}
+            {{ __('This document is a non-binding offer generated automatically from the calculator inputs.') }}<br>
+            {{ __('Prices and terms are subject to change and to the final signed contract.') }}<br>
+            {{ __('Ref') }}: <span class="ltr">{{ $reference }}</span>
         </div>
     </div>
 </body>

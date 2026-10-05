@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Rules\Turnstile;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class LeadInquiryRequest extends FormRequest
 {
@@ -28,6 +30,11 @@ class LeadInquiryRequest extends FormRequest
             'budget' => ['nullable', 'numeric', 'min:0'],
             'assigned_to' => ['nullable', 'exists:users,id'],
             'follow_up_at' => ['nullable', 'date'],
+            'turnstile' => Rule::when(
+                config('services.turnstile.enabled') && config('services.turnstile.secret_key'),
+                ['required', 'string', new Turnstile],
+                []
+            ),
         ];
     }
 }

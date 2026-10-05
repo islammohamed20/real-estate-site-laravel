@@ -1,10 +1,70 @@
 @extends('layouts.dashboard')
 
 @section('content')
-    <div x-data="crmKanban()" x-init="init()" class="space-y-6">
+    <div x-data="{
+        open: false,
+        dragSrc: null,
+        openDealModal() { this.open = true; },
+        closeDealModal() { this.open = false; },
+        init() {
+            const tokenMeta = document.querySelector('meta[name=csrf-token]');
+            const token = tokenMeta ? tokenMeta.getAttribute('content') : '';
+
+            document.querySelectorAll('.deal-card').forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    this.dragSrc = card;
+                    card.classList.add('opacity-50');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('opacity-50');
+                    this.dragSrc = null;
+                });
+            });
+
+            document.querySelectorAll('.stage-column').forEach(col => {
+                col.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+
+                col.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    if (! this.dragSrc) return;
+
+                    const dealId = this.dragSrc.getAttribute('data-deal-id');
+                    const stageId = col.getAttribute('data-stage-id');
+                    const url = {{ Js::from(route('dashboard.crm.deals.index')) }} + '/' + dealId + '/stage';
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': token,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ stage_id: stageId }),
+                        });
+
+                        if (response.ok) {
+                            col.appendChild(this.dragSrc);
+                            window.location.reload();
+                        } else {
+                            const data = await response.json();
+                            alert(data.message || {{ Js::from(__('Could not move deal')) }});
+                        }
+                    } catch (err) {
+                        console.error(err);
+                    }
+                });
+            });
+        }
+    }" x-init="init()" class="space-y-6">
     @include('crm.partials.crm-nav')
         <template x-if="open">
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" @click.outside="open = false" @keydown.escape.window="open = false">
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" @click.outside="closeDealModal()" @keydown.escape.window="closeDealModal()">
                 <div class="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
                     <h2 class="text-xl font-semibold text-white">{{ __('New Deal') }}</h2>
                     <form method="POST" action="{{ route('dashboard.crm.deals.store') }}" class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -135,7 +195,7 @@
 
                         <div class="flex gap-2 sm:col-span-2">
                             <button type="submit" class="app-button">{{ __('Create Deal') }}</button>
-                            <button type="button" @click="open = false" class="app-button--ghost">{{ __('Cancel') }}</button>
+                            <button type="button" @click="closeDealModal()" class="app-button--ghost">{{ __('Cancel') }}</button>
                         </div>
                     </form>
                 </div>
@@ -160,9 +220,9 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
-                        @can('manage crm')
-                            <button type="button" @click="open = true" class="app-button">{{ __('+ New Deal') }}</button>
-                        @endcan
+                        @canany(['manage crm', 'create deals'])
+                            <button type="button" @click="openDealModal()" class="app-button">{{ __('+ New Deal') }}</button>
+                        @endcanany
                         <a href="{{ route('dashboard.crm.index') }}" class="app-button--ghost">{{ __('Leads & Customers') }}</a>
                     </div>
                 </div>
@@ -307,73 +367,4 @@
         </section>
     </div>
 
-    @push('scripts')
-        <script>
-            function crmKanban() {
-                return {
-                    open: false,
-                    dragSrc: null,
-
-                    init() {
-                        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-                        document.querySelectorAll('.deal-card').forEach(card => {
-                            card.addEventListener('dragstart', (e) => {
-                                this.dragSrc = card;
-                                card.classList.add('opacity-50');
-                                e.dataTransfer.effectAllowed = 'move';
-                            });
-
-                            card.addEventListener('dragend', () => {
-                                card.classList.remove('opacity-50');
-                                this.dragSrc = null;
-                            });
-                        });
-
-                        document.querySelectorAll('.stage-column').forEach(col => {
-                            col.addEventListener('dragover', (e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = 'move';
-                            });
-
-                            col.addEventListener('drop', async (e) => {
-                                e.preventDefault();
-                                if (! this.dragSrc) return;
-
-                                const dealId = this.dragSrc.getAttribute('data-deal-id');
-                                const stageId = col.getAttribute('data-stage-id');
-                                const url = `{{ route('dashboard.crm.deals.index') }}/${dealId}/stage`;
-
-                                try {
-                                    const response = await fetch(url, {
-                                        method: 'PATCH',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRF-TOKEN': token,
-                                            'Accept': 'application/json',
-                                        },
-                                        body: JSON.stringify({ stage_id: stageId }),
-                                    });
-
-                                    if (response.ok) {
-                                        col.appendChild(this.dragSrc);
-                                        window.location.reload();
-                                    } else {
-                                        const data = await response.json();
-                                        alert(data.message || '{{ __('Could not move deal') }}');
-                                    }
-                                } catch (err) {
-                                    console.error(err);
-                                }
-                            });
-                        });
-                    },
-
-                    openDealModal() {
-                        this.open = true;
-                    },
-                };
-            }
-        </script>
-    @endpush
 @endsection

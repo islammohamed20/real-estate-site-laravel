@@ -13,6 +13,9 @@
             <div>
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="badge badge-brand">{{ __($project->status) }}</span>
+                    @if ($project->current_phase)
+                        <span class="badge badge-success">{{ __('المرحلة الحالية') }}: {{ $project->current_phase }}</span>
+                    @endif
                     @if ($project->featured)
                         <span class="badge badge-violet">{{ __('★ Featured') }}</span>
                     @endif
@@ -43,10 +46,10 @@
                                 <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->country ?? __('—') }}</p>
                             </div>
 
-                            {{-- Phases --}}
+                            {{-- Current Phase --}}
                             <div class="touch-card px-3 py-2">
-                                <p class="touch-card__label text-[10px]">{{ __('Phases') }}</p>
-                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->phases->count() }}</p>
+                                <p class="touch-card__label text-[10px]">{{ __('المرحلة الحالية') }}</p>
+                                <p class="mt-0.5 text-sm font-semibold text-white">{{ $project->current_phase ?? __('—') }}</p>
                             </div>
 
                             {{-- Units --}}
@@ -136,8 +139,8 @@
                                 'bathrooms' => (int) $unit->bathrooms,
                                 'price' => (float) $unit->current_price,
                                 'status' => $unit->status?->value ?? 'available',
-                                'url' => route('public.units.show', $unit->unit_number),
-                                'calc_url' => route('installments.index', ['unit_id' => $unit->id]),
+                                'url' => route('public.units.show', $unit->id),
+                                'calc_url' => $unit->status?->value === 'available' ? route('installments.index', ['unit_id' => $unit->id]) : null,
                                 'floor_plan' => $unit->floor_plan_path ? asset('storage/'.$unit->floor_plan_path) : null,
                                 'floor_plan_is_image' => $unit->floor_plan_path
                                     ? in_array(strtolower(pathinfo($unit->floor_plan_path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'], true)
@@ -169,6 +172,14 @@
                     },
                     selectUnit(u) {
                         this.selectedUnit = (this.selectedUnit && this.selectedUnit.id === u.id) ? null : u;
+                        if (this.selectedUnit && window.matchMedia('(max-width: 1023px)').matches) {
+                            this.$nextTick(() => {
+                                const preview = document.getElementById('units');
+                                if (preview) {
+                                    preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            });
+                        }
                     },
                     tileClass(u) {
                         const base = 'group relative flex min-h-14 min-w-0 flex-col items-center justify-center rounded-xl border px-2 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg';
@@ -178,7 +189,7 @@
                         const map = {
                             available: 'border-emerald-500/40 bg-emerald-500/10 hover:border-emerald-400/70 hover:bg-emerald-500/20',
                             reserved: 'border-amber-500/40 bg-amber-500/10 hover:border-amber-400/70 hover:bg-amber-500/20',
-                            sold: 'border-rose-500/40 bg-rose-500/10 hover:border-rose-400/70 hover:bg-rose-500/20',
+                            sold: 'border-rose-500/40 bg-white text-rose-700 hover:border-rose-400/70 hover:bg-rose-50',
                             hidden: 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10',
                         };
                         return base + ' ' + (map[u.status] || map.hidden);
@@ -187,7 +198,7 @@
                         return { available: 'bg-emerald-400', reserved: 'bg-amber-400', sold: 'bg-rose-400', hidden: 'bg-slate-500' }[u.status] || 'bg-slate-500';
                     },
                     badgeClass(u) {
-                        return { available: 'badge badge-success', reserved: 'badge badge-warning', sold: 'badge badge-danger', hidden: 'badge badge-muted' }[u.status] || 'badge badge-muted';
+                        return { available: 'badge badge-success', reserved: 'badge badge-warning', sold: 'badge badge-sold', hidden: 'badge badge-muted' }[u.status] || 'badge badge-muted';
                     },
                     money(v) {
                         return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(v || 0);
@@ -274,8 +285,8 @@
                                                     :title="u.number + ' — ' + (statusLabels[u.status] || u.status)"
                                                 >
                                                     <span class="absolute end-1.5 top-1.5 h-2 w-2 rounded-full ring-2 ring-slate-950/60" :class="dotClass(u)"></span>
-                                                    <span class="text-sm font-extrabold text-white" x-text="u.number"></span>
-                                                    <span class="mt-0.5 max-w-full truncate text-[10px] text-slate-400" x-text="u.area ? u.area + ' ' + m2 : ''"></span>
+                                                    <span class="text-sm font-extrabold" :class="u.status === 'sold' ? 'text-rose-700' : 'text-white'" x-text="u.number"></span>
+                                                    <span class="mt-0.5 max-w-full truncate text-[10px]" :class="u.status === 'sold' ? 'text-rose-500' : 'text-slate-400'" x-text="u.area ? u.area + ' ' + m2 : ''"></span>
                                                 </button>
                                             </template>
                                         </div>
@@ -307,10 +318,12 @@
                                     <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke-width="1.8"/></svg>
                                     {{ __('View unit details') }}
                                 </a>
-                                <a :href="selectedUnit.calc_url" class="app-button--ghost justify-center gap-2 py-2.5 text-sm">
-                                    <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" stroke-width="1.8"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01M16 18.5h.01" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                    {{ __('Calculate installment') }}
-                                </a>
+                                <template x-if="selectedUnit.status === 'available'">
+                                    <a :href="selectedUnit.calc_url" class="app-button--ghost justify-center gap-2 py-2.5 text-sm">
+                                        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" stroke-width="1.8"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01M16 18.5h.01" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                        {{ __('Calculate installment') }}
+                                    </a>
+                                </template>
                             </div>
                         </div>
                     </template>

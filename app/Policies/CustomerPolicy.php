@@ -32,7 +32,9 @@ class CustomerPolicy extends BasePolicy
             return true;
         }
 
-        return $user->hasPermissionTo('view own customers');
+        return $user->hasPermissionTo('view own customers')
+            && $model instanceof Customer
+            && $model->leads()->where('assigned_sales_id', $user->id)->exists();
     }
 
     public function create(User $user, mixed $model = null): bool
@@ -54,7 +56,8 @@ class CustomerPolicy extends BasePolicy
             return true;
         }
 
-        return $user->hasPermissionTo('edit own customers');
+        return $user->hasPermissionTo('edit own customers')
+            && $model->leads()->where('assigned_sales_id', $user->id)->exists();
     }
 
     public function delete(User $user, mixed $model = null): bool

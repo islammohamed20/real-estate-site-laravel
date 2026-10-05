@@ -8,11 +8,15 @@ use App\Events\OfferCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\OfferRequest;
 use App\Models\Customer;
+use App\Models\InstallmentTemplate;
 use App\Models\Lead;
 use App\Models\Offer;
 use App\Models\Project;
 use App\Models\Unit;
 use App\Models\User;
+use App\Models\Building;
+use App\Models\CompanyProfile;
+use App\Models\Floor;
 use App\Notifications\CrmActivityNotification;
 use App\Services\PushNotificationService;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +30,14 @@ class OfferController extends Controller
     {
         $this->authorize('viewAny', Offer::class);
 
+        $canViewAll = auth()->user()->hasAnyPermission(['view reports', 'manage crm']);
+
         $offers = Offer::query()
+            ->when(! $canViewAll, fn ($q) => $q->where(function ($scope): void {
+                $scope->where('sales_id', auth()->id())
+                    ->orWhereHas('lead', fn ($lead) => $lead->where('assigned_sales_id', auth()->id()))
+                    ->orWhereHas('customer.leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id()));
+            }))
             ->with(['customer', 'lead', 'unit.project', 'sales'])
             ->when($request->filled('search'), function (Builder $q, $search) {
                 $q->where('offer_number', 'like', "%{$search}%")
@@ -50,12 +61,23 @@ class OfferController extends Controller
     {
         $this->authorize('create', Offer::class);
 
+        [$units, $unitsData, $buildingsData, $floorsData] = $this->buildUnitSelectionData($offer = null);
+
         return view('crm.offers.form', [
             'offer' => null,
-            'customers' => Customer::query()->orderBy('name')->pluck('name', 'id'),
-            'leads' => Lead::query()->orderBy('name')->pluck('name', 'id'),
+            'customers' => Customer::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id())))
+                ->orderBy('name')->pluck('name', 'id'),
+            'leads' => Lead::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->where('assigned_sales_id', auth()->id()))
+                ->orderBy('name')->pluck('name', 'id'),
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
-            'units' => Unit::query()->with('project')->orderBy('unit_number')->get()->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]),
+            'units' => $units,
+            'unitsData' => $unitsData,
+            'buildingsData' => $buildingsData,
+            'floorsData' => $floorsData,
+            'installmentTemplates' => InstallmentTemplate::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'currency' => CompanyProfile::first()?->currency_code ?? 'EGP',
         ]);
     }
 
@@ -105,12 +127,23 @@ class OfferController extends Controller
 
         $offer->load(['customer', 'lead', 'unit.project']);
 
+        [$units, $unitsData, $buildingsData, $floorsData] = $this->buildUnitSelectionData($offer);
+
         return view('crm.offers.form', [
             'offer' => $offer,
-            'customers' => Customer::query()->orderBy('name')->pluck('name', 'id'),
-            'leads' => Lead::query()->orderBy('name')->pluck('name', 'id'),
+            'customers' => Customer::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->whereHas('leads', fn ($lead) => $lead->where('assigned_sales_id', auth()->id())))
+                ->orderBy('name')->pluck('name', 'id'),
+            'leads' => Lead::query()
+                ->when(! auth()->user()->hasAnyPermission(['view reports', 'manage crm']), fn ($q) => $q->where('assigned_sales_id', auth()->id()))
+                ->orderBy('name')->pluck('name', 'id'),
             'projects' => Project::query()->orderBy('name')->pluck('name', 'id'),
-            'units' => Unit::query()->with('project')->orderBy('unit_number')->get()->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]),
+            'units' => $units,
+            'unitsData' => $unitsData,
+            'buildingsData' => $buildingsData,
+            'floorsData' => $floorsData,
+            'installmentTemplates' => InstallmentTemplate::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
+            'currency' => CompanyProfile::first()?->currency_code ?? 'EGP',
         ]);
     }
 
@@ -130,5 +163,64 @@ class OfferController extends Controller
 
         return redirect()->route('dashboard.crm.offers.index')
             ->with('status', __('Offer moved to trash.'));
+    }
+
+    /**
+     * Build the unit selection data for the offers form.
+     *
+     * Only available units are offered for sale by default, but the currently
+     * selected unit (when editing) is always included so it stays selectable.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection, 3: \Illuminate\Support\Collection}
+     */
+    private function buildUnitSelectionData(?Offer $offer): array
+    {
+        $currentUnitId = $offer?->unit_id;
+
+        $unitsQuery = Unit::query()
+            ->with(['project', 'building', 'floor'])
+            ->where(function (Builder $q) use ($currentUnitId): void {
+                $q->where('status', 'available')
+                    ->when($currentUnitId, fn (Builder $sq) => $sq->orWhere('id', $currentUnitId));
+            })
+            ->orderBy('unit_number')
+            ->get();
+
+        $units = $unitsQuery->mapWithKeys(fn ($u) => [$u->id => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number]);
+
+        $unitsData = $unitsQuery->map(fn ($u) => [
+            'id' => $u->id,
+            'project_id' => $u->project_id,
+            'building_id' => $u->building_id,
+            'floor_id' => $u->floor_id,
+            'label' => ($u->project?->name ?? __('Unit')).' #'.$u->unit_number,
+            'unit_number' => $u->unit_number,
+            'unit_type' => $u->unit_type,
+            'area' => (float) $u->area,
+            'bedrooms' => $u->bedrooms,
+            'bathrooms' => $u->bathrooms,
+            'current_price' => (float) $u->current_price,
+            'status' => $u->status?->value ?? $u->status,
+        ]);
+
+        $buildingsData = Building::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'project_id', 'name'])
+            ->map(fn ($b) => ['id' => $b->id, 'project_id' => $b->project_id, 'name' => $b->name]);
+
+        $floorsData = Floor::query()
+            ->orderBy('sort_order')
+            ->orderByDesc('number')
+            ->get(['id', 'project_id', 'building_id', 'number', 'name'])
+            ->map(fn ($f) => [
+                'id' => $f->id,
+                'project_id' => $f->project_id,
+                'building_id' => $f->building_id,
+                'number' => $f->number,
+                'name' => $f->name ?? (string) $f->number,
+            ]);
+
+        return [$units, $unitsData, $buildingsData, $floorsData];
     }
 }

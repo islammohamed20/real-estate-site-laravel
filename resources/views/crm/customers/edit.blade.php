@@ -67,7 +67,7 @@
             </div>
             <div>
                 <label for="source" class="mb-1 block text-sm font-medium text-slate-300">{{ __('Source') }}</label>
-                <select id="source" name="source" class="app-input">
+                <select id="source" name="source" required class="app-input">
                     <option value="">{{ __('Select source') }}</option>
                     @foreach ($sources as $sourceName)
                         <option value="{{ $sourceName }}" @selected(old('source', $customer->source) === $sourceName)>{{ $sourceName }}</option>

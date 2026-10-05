@@ -6,10 +6,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Settings\UpdateCompanyProfileRequest;
 use App\Models\CompanyProfile;
+use App\Models\InstallmentTemplate;
 use App\Support\NotificationRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -21,6 +23,11 @@ class SettingsController extends Controller
 
         return view('settings.index', [
             'profile' => CompanyProfile::query()->firstOrCreate(['id' => 1], ['name' => config('app.name')]),
+            'defaultDownPaymentPercent' => (float) (InstallmentTemplate::query()
+                ->where('is_active', true)
+                ->orderByDesc('is_default')
+                ->orderBy('name')
+                ->value('down_payment_percent') ?? 25),
             'notificationTypes' => NotificationRegistry::types(),
             'notificationUser' => $user,
             // Computed here (not via a Blade @php block) because the Blade
@@ -50,6 +57,12 @@ class SettingsController extends Controller
     public function update(UpdateCompanyProfileRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $defaultDownPaymentPercent = $data['default_down_payment_percent'] ?? null;
+        unset($data['default_down_payment_percent']);
+
+        if (blank($data['evolution_api_key'] ?? null)) {
+            unset($data['evolution_api_key']);
+        }
 
         // Checkboxes are not submitted when unchecked, so normalize explicitly.
         $data['auto_purge_enabled'] = $request->boolean('auto_purge_enabled');
@@ -69,7 +82,20 @@ class SettingsController extends Controller
         $data['favicon_path'] = $this->storeAsset($request->file('favicon'), $data['favicon_path'] ?? null, 'favicons');
         $data['seo_image_path'] = $this->storeAsset($request->file('seo_image'), $data['seo_image_path'] ?? null, 'seo');
 
-        CompanyProfile::query()->updateOrCreate(['id' => 1], $data);
+        DB::transaction(function () use ($data, $defaultDownPaymentPercent): void {
+            CompanyProfile::query()->updateOrCreate(['id' => 1], $data);
+
+            if ($defaultDownPaymentPercent === null) {
+                return;
+            }
+
+            InstallmentTemplate::query()
+                ->where('is_active', true)
+                ->orderByDesc('is_default')
+                ->orderBy('name')
+                ->first()
+                ?->update(['down_payment_percent' => $defaultDownPaymentPercent]);
+        });
 
         return back()->with('status', __('Settings updated successfully.'));
     }

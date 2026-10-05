@@ -168,7 +168,7 @@
                             <form method="POST" action="{{ route('dashboard.trash.projects.force-delete', $project) }}">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete :name? This cannot be undone and will also remove its buildings and floors.', ['name' => $project->name]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}')" class="app-button app-button--danger px-4 py-2 text-xs">
+                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete :name? This cannot be undone and will also remove its buildings and floors.', ['name' => $project->name]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}', true)" class="app-button app-button--danger px-4 py-2 text-xs">
                                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8" stroke-linecap="round"/></svg>
                                     {{ __('Delete forever') }}
                                 </button>
@@ -221,7 +221,7 @@
                             <form method="POST" action="{{ route('dashboard.trash.units.force-delete', $unit) }}">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete unit :num? This cannot be undone.', ['num' => $unit->unit_number]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}')" class="app-button app-button--danger px-4 py-2 text-xs">
+                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete unit :num? This cannot be undone.', ['num' => $unit->unit_number]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}', true)" class="app-button app-button--danger px-4 py-2 text-xs">
                                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8" stroke-linecap="round"/></svg>
                                     {{ __('Delete forever') }}
                                 </button>
@@ -264,7 +264,7 @@
                             <form method="POST" action="{{ route('dashboard.trash.buildings.force-delete', $building) }}">
                                 @csrf
                                 @method('DELETE')
-                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete building :name? This cannot be undone and will also remove its floors.', ['name' => $building->name]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}')" class="app-button app-button--danger px-4 py-2 text-xs">
+                                <button type="button" onclick="confirmAction('{{ __('Delete forever') }}', '{{ __('Permanently delete building :name? This cannot be undone and will also remove its floors.', ['name' => $building->name]) }}', () => this.closest('form').submit(), '{{ __('Delete forever') }}', true)" class="app-button app-button--danger px-4 py-2 text-xs">
                                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6" stroke-width="1.8" stroke-linecap="round"/></svg>
                                     {{ __('Delete forever') }}
                                 </button>

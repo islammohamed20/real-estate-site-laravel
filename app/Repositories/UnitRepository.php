@@ -30,6 +30,10 @@ class UnitRepository extends BaseRepository implements UnitRepositoryInterface
             $query->where('building_id', (int) $filters['building_id']);
         }
 
+        if (! empty($filters['floor_id'])) {
+            $query->where('floor_id', (int) $filters['floor_id']);
+        }
+
         if (! empty($filters['unit_type'])) {
             $query->where('unit_type', $filters['unit_type']);
         }
@@ -44,6 +48,10 @@ class UnitRepository extends BaseRepository implements UnitRepositoryInterface
 
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status'] instanceof UnitStatus ? $filters['status']->value : $filters['status']);
+        }
+
+        if (! empty($filters['website_visible'])) {
+            $query->publiclyVisible();
         }
 
         if (! empty($filters['search'])) {

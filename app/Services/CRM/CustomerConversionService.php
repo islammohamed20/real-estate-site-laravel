@@ -27,11 +27,19 @@ class CustomerConversionService
      */
     public function convertFromLead(Lead $lead, ?string $source = null): Customer
     {
-        if ($lead->customer_id !== null) {
-            return $lead->customer;
-        }
-
         return DB::transaction(function () use ($lead, $source): Customer {
+            $customerSource = strcasecmp((string) $lead->source, 'portal') === 0
+                ? 'Website'
+                : ($source ?? $lead->source);
+
+            if ($lead->customer_id !== null) {
+                $customer = $lead->customer;
+                $customer->forceFill(['source' => $customerSource])->save();
+                $lead->forceFill(['converted_at' => $lead->converted_at ?? now()])->save();
+
+                return $customer;
+            }
+
             $customer = Customer::query()->firstOrCreate(
                 ['phone' => $lead->phone],
                 [
@@ -41,10 +49,14 @@ class CustomerConversionService
                     'address' => $lead->address,
                     'occupation' => $lead->occupation,
                     'budget' => $lead->budget,
-                    'source' => $source ?? $lead->source,
+                    'source' => $customerSource,
                     'notes' => $lead->notes,
                 ]
             );
+
+            if ($customer->wasRecentlyCreated === false && strcasecmp((string) $lead->source, 'portal') === 0) {
+                $customer->forceFill(['source' => 'Website'])->save();
+            }
 
             $lead->update([
                 'customer_id' => $customer->id,
